@@ -598,9 +598,152 @@
             .stat-value { font-size: 1.5rem; }
             .page-title { font-size: 1.25rem; }
         }
+        
+        /* ========== PASSWORD MODAL ========== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            padding: 24px;
+        }
+        
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            width: 100%;
+            max-width: 360px;
+            background: var(--color-surface);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            transform: scale(0.95);
+            transition: transform 0.2s ease;
+        }
+        
+        .modal-overlay.visible .modal {
+            transform: scale(1);
+        }
+        
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .modal-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--color-accent-soft);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-accent);
+        }
+        
+        .modal-title {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--color-text);
+        }
+        
+        .modal-desc {
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        
+        .modal-input {
+            width: 100%;
+            padding: 14px 16px;
+            background: transparent;
+            border: 1.5px solid var(--color-border);
+            border-radius: var(--radius-md);
+            font-family: var(--font-body);
+            font-size: 1rem;
+            color: var(--color-text);
+            margin-bottom: 24px;
+            transition: all 0.2s ease;
+            min-height: 50px;
+        }
+        
+        .modal-input:focus {
+            outline: none;
+            border-color: var(--color-accent);
+            box-shadow: 0 0 0 3px var(--color-accent-soft);
+        }
+        
+        .modal-input::placeholder {
+            color: var(--color-text-muted);
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .modal-btn {
+            flex: 1;
+            padding: 12px 20px;
+            font-family: var(--font-body);
+            font-size: 0.875rem;
+            font-weight: 500;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .modal-btn-cancel {
+            background: var(--color-bg);
+            border: 1px solid var(--color-border);
+            color: var(--color-text-secondary);
+        }
+        
+        .modal-btn-cancel:hover {
+            background: var(--color-border);
+            color: var(--color-text);
+        }
+        
+        .modal-btn-confirm {
+            background: var(--color-text);
+            border: none;
+            color: white;
+        }
+        
+        .modal-btn-confirm:hover {
+            opacity: 0.9;
+        }
+        
+        /* Hide content until authenticated */
+        body.locked .header,
+        body.locked .main {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        body.locked .modal-overlay {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        body.locked .modal-overlay .modal {
+            transform: scale(1);
+        }
     </style>
 </head>
-<body>
+<body class="locked">
     <header class="header">
         <div class="header-left">
             <a href="/" class="logo-wordmark">
@@ -852,12 +995,104 @@
         </div>
     </main>
     
+    <!-- Password Modal -->
+    <div class="modal-overlay" id="passwordModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0110 0v4"/>
+                    </svg>
+                </div>
+                <h3 class="modal-title">Platform Admin</h3>
+            </div>
+            <p class="modal-desc">Enter your password to access platform admin.</p>
+            <input type="password" class="modal-input" id="passwordInput" placeholder="Password" autocomplete="off">
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" onclick="cancelAuth()">Back</button>
+                <button class="modal-btn modal-btn-confirm" onclick="submitPassword()">Continue</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- Page Loader -->
     <div class="page-loader" id="pageLoader">
         <div class="page-loader-spinner"></div>
     </div>
     
     <script>
+        // ==================== AUTH ====================
+        // Uses same password as admin.html (COACHD_ADMIN_PASSWORD)
+        let adminPassword = sessionStorage.getItem('adminPassword') || '';
+        
+        async function initAuth() {
+            if (!adminPassword) {
+                document.getElementById('passwordInput').focus();
+            } else {
+                const valid = await verifyPassword(adminPassword);
+                if (valid) {
+                    unlockPage();
+                } else {
+                    adminPassword = '';
+                    sessionStorage.removeItem('adminPassword');
+                    document.getElementById('passwordInput').focus();
+                }
+            }
+        }
+        
+        async function verifyPassword(pwd) {
+            try {
+                // Use same auth endpoint as admin.html
+                const res = await fetch('/api/admin/stats', {
+                    headers: { 'X-Admin-Password': pwd }
+                });
+                return res.status !== 401;
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        function unlockPage() {
+            document.body.classList.remove('locked');
+            document.getElementById('passwordModal').classList.remove('visible');
+            loadData();
+            refreshInterval = setInterval(loadData, 60000);
+        }
+        
+        function cancelAuth() {
+            window.location.href = '/';
+        }
+        
+        async function submitPassword() {
+            const pwd = document.getElementById('passwordInput').value;
+            const valid = await verifyPassword(pwd);
+            if (valid) {
+                adminPassword = pwd;
+                sessionStorage.setItem('adminPassword', pwd);
+                unlockPage();
+            } else {
+                showToast('Invalid password');
+                document.getElementById('passwordInput').value = '';
+                document.getElementById('passwordInput').focus();
+            }
+        }
+        
+        // Handle Enter key
+        document.getElementById('passwordInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') submitPassword();
+        });
+        
+        // Toast notification
+        function showToast(message) {
+            // Simple alert for now - could add toast UI later
+            alert(message);
+        }
+        
+        // Init auth on load
+        initAuth();
+        
+        // ==================== DASHBOARD ====================
         let costChart = null;
         let refreshInterval = null;
         
@@ -1199,14 +1434,6 @@
         function hidePageLoader() {
             document.getElementById('pageLoader').classList.add('hidden');
         }
-        
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            loadData();
-            
-            // Auto-refresh every 60 seconds
-            refreshInterval = setInterval(loadData, 60000);
-        });
         
         // Hide loader once page is ready
         window.addEventListener('load', () => {

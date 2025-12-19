@@ -715,12 +715,12 @@
         .modal-icon {
             width: 40px;
             height: 40px;
-            background: var(--color-surface);
+            background: var(--color-blue-soft);
             border-radius: var(--radius-md);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--color-text-secondary);
+            color: var(--color-blue-dark);
         }
         
         .modal-title {
@@ -739,20 +739,22 @@
         
         .modal-input {
             width: 100%;
-            padding: 12px 16px;
-            background: var(--color-surface);
-            border: 1px solid var(--color-border);
+            padding: 14px 16px;
+            background: transparent;
+            border: 1.5px solid var(--color-border);
             border-radius: var(--radius-md);
             font-family: var(--font-body);
-            font-size: 0.95rem;
+            font-size: 1rem;
             color: var(--color-text);
             margin-bottom: 24px;
-            transition: border-color 0.15s ease;
+            transition: all 0.2s ease;
+            min-height: 50px;
         }
         
         .modal-input:focus {
             outline: none;
-            border-color: var(--color-text);
+            border-color: var(--color-blue-dark);
+            box-shadow: 0 0 0 3px var(--color-blue-soft);
         }
         
         .modal-input::placeholder {
@@ -822,6 +824,22 @@
             pointer-events: auto;
         }
         
+        /* Hide content until authenticated */
+        body.locked .header,
+        body.locked .main {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        body.locked .modal-overlay {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        body.locked .modal-overlay .modal {
+            transform: scale(1);
+        }
+        
         .page-loader-spinner {
             width: 40px;
             height: 40px;
@@ -888,7 +906,7 @@
         }
     </style>
 </head>
-<body>
+<body class="locked">
     <header class="header">
         <div class="header-left">
             <a href="/" class="logo">
@@ -1117,10 +1135,10 @@
                 </div>
                 <h3 class="modal-title">Admin Access</h3>
             </div>
-            <p class="modal-desc">Enter your admin password to view performance data.</p>
+            <p class="modal-desc">Enter your password to access the admin dashboard.</p>
             <input type="password" class="modal-input" id="passwordInput" placeholder="Password" autocomplete="off">
             <div class="modal-actions">
-                <button class="modal-btn modal-btn-cancel" onclick="closePasswordModal()">Cancel</button>
+                <button class="modal-btn modal-btn-cancel" onclick="cancelAuth()">Back</button>
                 <button class="modal-btn modal-btn-confirm" onclick="submitPassword()">Continue</button>
             </div>
         </div>
@@ -1147,9 +1165,44 @@
         // Admin password (from session or prompt)
         let adminPassword = sessionStorage.getItem('adminPassword') || '';
         
+        // Check auth on page load
+        async function initAuth() {
+            if (!adminPassword) {
+                // No stored password, show modal (body is already locked via CSS)
+                document.getElementById('passwordInput').focus();
+            } else {
+                // Verify stored password works
+                const valid = await verifyPassword(adminPassword);
+                if (valid) {
+                    unlockPage();
+                } else {
+                    adminPassword = '';
+                    sessionStorage.removeItem('adminPassword');
+                    document.getElementById('passwordInput').focus();
+                }
+            }
+        }
+        
+        async function verifyPassword(pwd) {
+            try {
+                const res = await fetch(`/api/admin/stats`, {
+                    headers: { 'X-Admin-Password': pwd }
+                });
+                return res.status !== 401;
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        function unlockPage() {
+            document.body.classList.remove('locked');
+            document.getElementById('passwordModal').classList.remove('visible');
+        }
+        
         // Initialize
         updateAgencyDisplay();
         checkStatus();
+        initAuth();
         
         // ==================== VIEW SWITCHING ====================
         function switchView(view) {
@@ -1404,6 +1457,15 @@
             });
         }
         
+        function cancelAuth() {
+            // If page is locked, go back home. Otherwise just close modal.
+            if (document.body.classList.contains('locked')) {
+                window.location.href = '/';
+            } else {
+                closePasswordModal();
+            }
+        }
+        
         function closePasswordModal() {
             document.getElementById('passwordModal').classList.remove('visible');
             if (passwordResolve) {
@@ -1412,12 +1474,28 @@
             }
         }
         
-        function submitPassword() {
+        async function submitPassword() {
             const pwd = document.getElementById('passwordInput').value;
-            document.getElementById('passwordModal').classList.remove('visible');
-            if (passwordResolve) {
-                passwordResolve(pwd);
-                passwordResolve = null;
+            
+            if (document.body.classList.contains('locked')) {
+                // Initial auth - verify and unlock
+                const valid = await verifyPassword(pwd);
+                if (valid) {
+                    adminPassword = pwd;
+                    sessionStorage.setItem('adminPassword', pwd);
+                    unlockPage();
+                } else {
+                    showToast('Invalid password', 'error');
+                    document.getElementById('passwordInput').value = '';
+                    document.getElementById('passwordInput').focus();
+                }
+            } else {
+                // Re-auth for specific action
+                document.getElementById('passwordModal').classList.remove('visible');
+                if (passwordResolve) {
+                    passwordResolve(pwd);
+                    passwordResolve = null;
+                }
             }
         }
         

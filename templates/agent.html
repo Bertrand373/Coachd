@@ -374,7 +374,25 @@
         
         .section-header {
             text-align: center;
-            margin-bottom: 40px;
+            margin-bottom: 48px;
+            padding-top: 16px;
+        }
+        
+        .section-icon {
+            width: 56px;
+            height: 56px;
+            background: var(--color-accent-soft);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+        
+        .section-icon svg {
+            width: 28px;
+            height: 28px;
+            color: var(--color-accent);
         }
         
         .form-container {
@@ -438,6 +456,17 @@
         
         .form-input::placeholder { color: var(--color-text-muted); }
         
+        /* Hide number spinners */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        
         textarea.form-input {
             resize: vertical;
             min-height: 90px;
@@ -475,6 +504,7 @@
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
+            justify-content: center;
         }
         
         .product-pill {
@@ -496,6 +526,82 @@
             background: var(--color-text);
             border-color: var(--color-text);
             color: white;
+        }
+        
+        /* ========== COLLAPSIBLE DETAILS ========== */
+        .details-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            background: none;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-body);
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--color-text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .details-toggle:hover {
+            color: var(--color-text-secondary);
+            background: var(--color-surface);
+        }
+        
+        .details-toggle svg {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.2s ease;
+        }
+        
+        .details-toggle.expanded svg {
+            transform: rotate(90deg);
+        }
+        
+        .collapsible-details {
+            display: none;
+            padding-left: 12px;
+            border-left: 2px solid var(--color-border);
+            margin-left: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .collapsible-details.visible {
+            display: block;
+            animation: slideDown 0.2s ease;
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .collapsible-details .form-grid {
+            margin-bottom: 0;
+        }
+        
+        .skip-note {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: fit-content;
+            margin: 24px auto 0;
+            padding: 10px 16px;
+            background: var(--color-surface);
+            border-radius: var(--radius-full);
+            font-size: 0.75rem;
+            color: var(--color-text-muted);
+        }
+        
+        .skip-note svg {
+            width: 14px;
+            height: 14px;
+            min-width: 14px;
+            min-height: 14px;
+            flex-shrink: 0;
         }
         
         /* ========== MODE SELECTION ========== */
@@ -523,6 +629,15 @@
         .mode-card:hover {
             border-color: var(--color-accent);
             box-shadow: 0 4px 20px rgba(96, 165, 250, 0.12);
+        }
+        
+        .mode-card.primary {
+            border-color: var(--color-accent);
+            background: var(--color-accent-soft);
+        }
+        
+        .mode-card.primary:hover {
+            box-shadow: 0 4px 20px rgba(96, 165, 250, 0.2);
         }
         
         .mode-card:active { transform: scale(0.98); }
@@ -720,84 +835,103 @@
             <div class="screen" id="contextScreen">
                 <div class="context-screen">
                     <div class="section-header">
-                        <h2 class="section-title">Client Information</h2>
-                        <p class="section-subtitle">Enter details for tailored guidance</p>
+                        <div class="section-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                                <circle cx="12" cy="7" r="4"/>
+                            </svg>
+                        </div>
+                        <h2 class="section-title">Quick Prep</h2>
+                        <p class="section-subtitle">30 seconds for smarter coaching</p>
                     </div>
                     
                     <div class="form-container">
+                        <!-- Primary fields - always visible -->
                         <div class="form-grid">
-                        <div class="form-group">
-                            <label class="form-label">Age</label>
-                            <input type="number" class="form-input" id="clientAge" placeholder="45" inputmode="numeric">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Weight (lbs)</label>
-                            <input type="number" class="form-input" id="clientWeight" placeholder="180" inputmode="numeric">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Monthly Income</label>
-                            <input type="text" class="form-input" id="clientIncome" placeholder="$4,000" inputmode="numeric">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Sex</label>
-                            <div class="toggle-group">
-                                <button type="button" class="toggle-btn selected" data-field="sex" data-value="M">Male</button>
-                                <button type="button" class="toggle-btn" data-field="sex" data-value="F">Female</button>
+                            <div class="form-group">
+                                <label class="form-label">Client's Age</label>
+                                <input type="number" class="form-input" id="clientAge" placeholder="45" inputmode="numeric">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Sex</label>
+                                <div class="toggle-group">
+                                    <button type="button" class="toggle-btn selected" data-field="sex" data-value="M">Male</button>
+                                    <button type="button" class="toggle-btn" data-field="sex" data-value="F">Female</button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group full-width">
+                                <label class="form-label">Product</label>
+                                <div class="product-grid">
+                                    <button type="button" class="product-pill selected" data-product="whole_life">Whole Life</button>
+                                    <button type="button" class="product-pill" data-product="term_life">Term</button>
+                                    <button type="button" class="product-pill" data-product="cancer">Cancer</button>
+                                    <button type="button" class="product-pill" data-product="accident">Accident</button>
+                                    <button type="button" class="product-pill" data-product="critical_illness">Critical Illness</button>
+                                </div>
                             </div>
                         </div>
                         
-                        <div class="form-group">
-                            <label class="form-label">Tobacco</label>
-                            <div class="toggle-group">
-                                <button type="button" class="toggle-btn selected" data-field="tobacco" data-value="N">No</button>
-                                <button type="button" class="toggle-btn" data-field="tobacco" data-value="Y">Yes</button>
+                        <!-- Collapsible additional details -->
+                        <button type="button" class="details-toggle" id="detailsToggle" onclick="toggleDetails()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 5l7 7-7 7"/>
+                            </svg>
+                            Add details for better coaching
+                        </button>
+                        
+                        <div class="collapsible-details" id="collapsibleDetails">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label class="form-label">Weight (lbs)</label>
+                                    <input type="number" class="form-input" id="clientWeight" placeholder="180" inputmode="numeric">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label">Monthly Income</label>
+                                    <input type="text" class="form-input" id="clientIncome" placeholder="$4,000" inputmode="numeric">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label">Tobacco</label>
+                                    <div class="toggle-group">
+                                        <button type="button" class="toggle-btn selected" data-field="tobacco" data-value="N">No</button>
+                                        <button type="button" class="toggle-btn" data-field="tobacco" data-value="Y">Yes</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label">Married</label>
+                                    <div class="toggle-group">
+                                        <button type="button" class="toggle-btn" data-field="married" data-value="Y">Yes</button>
+                                        <button type="button" class="toggle-btn selected" data-field="married" data-value="N">No</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label">Kids</label>
+                                    <div class="toggle-group">
+                                        <button type="button" class="toggle-btn" data-field="kids" data-value="Y">Yes</button>
+                                        <button type="button" class="toggle-btn selected" data-field="kids" data-value="N">No</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group" id="kidsCountGroup" style="display: none;">
+                                    <label class="form-label">How Many</label>
+                                    <input type="number" class="form-input" id="kidsCount" placeholder="2" inputmode="numeric" min="1" max="20">
+                                </div>
+                                
+                                <div class="form-group full-width">
+                                    <label class="form-label">Known Objection</label>
+                                    <textarea class="form-input" id="clientIssue" placeholder="e.g., Says they can't afford it, needs to talk to spouse, already has coverage..."></textarea>
+                                </div>
                             </div>
                         </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Married</label>
-                            <div class="toggle-group">
-                                <button type="button" class="toggle-btn" data-field="married" data-value="Y">Yes</button>
-                                <button type="button" class="toggle-btn selected" data-field="married" data-value="N">No</button>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Kids</label>
-                            <div class="toggle-group">
-                                <button type="button" class="toggle-btn" data-field="kids" data-value="Y">Yes</button>
-                                <button type="button" class="toggle-btn selected" data-field="kids" data-value="N">No</button>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group" id="kidsCountGroup" style="display: none;">
-                            <label class="form-label">How Many</label>
-                            <input type="number" class="form-input" id="kidsCount" placeholder="2" inputmode="numeric" min="1" max="20">
-                        </div>
-                        
-                        <div class="form-group full-width">
-                            <label class="form-label">Product Focus</label>
-                            <div class="product-grid">
-                                <button type="button" class="product-pill selected" data-product="whole_life">Whole Life</button>
-                                <button type="button" class="product-pill" data-product="term_life">Term</button>
-                                <button type="button" class="product-pill" data-product="cancer">Cancer</button>
-                                <button type="button" class="product-pill" data-product="accident">Accident</button>
-                                <button type="button" class="product-pill" data-product="critical_illness">Critical Illness</button>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group full-width">
-                            <label class="form-label">Issue / Objection (optional)</label>
-                            <textarea class="form-input" id="clientIssue" placeholder="e.g., Says they can't afford it, needs to talk to spouse, already has coverage..."></textarea>
-                        </div>
-                    </div>
                     </div>
                     
                     <div class="mode-selection">
-                        <a href="#" class="mode-card" id="chatMode" onclick="startChat(event)">
+                        <a href="#" class="mode-card primary" id="chatMode" onclick="startChat(event)">
                             <div class="mode-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
@@ -819,6 +953,15 @@
                             <div class="mode-title">Live Call</div>
                             <div class="mode-desc">Real-time AI coaching</div>
                         </a>
+                    </div>
+                    
+                    <div class="skip-note">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="16" x2="12" y2="12"/>
+                            <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        Skip prep? Coaching still works, just less personalized.
                     </div>
                 </div>
             </div>
@@ -944,6 +1087,33 @@
                 clientContext.product = pill.dataset.product;
             });
         });
+        
+        // Toggle collapsible details
+        function toggleDetails() {
+            const toggle = document.getElementById('detailsToggle');
+            const details = document.getElementById('collapsibleDetails');
+            const isExpanded = toggle.classList.contains('expanded');
+            
+            if (isExpanded) {
+                toggle.classList.remove('expanded');
+                details.classList.remove('visible');
+                toggle.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 5l7 7-7 7"/>
+                    </svg>
+                    Add details for better coaching
+                `;
+            } else {
+                toggle.classList.add('expanded');
+                details.classList.add('visible');
+                toggle.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 5l7 7-7 7"/>
+                    </svg>
+                    Less details
+                `;
+            }
+        }
         
         // Gather context from form
         function gatherContext() {

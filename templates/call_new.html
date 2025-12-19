@@ -224,19 +224,41 @@
             max-width: 340px;
         }
         
+        .identify-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .identify-icon {
+            width: 56px;
+            height: 56px;
+            background: var(--accent-soft);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+        
+        .identify-icon svg {
+            width: 28px;
+            height: 28px;
+            color: var(--accent-dark);
+        }
+        
         .identify-title {
             font-family: 'Outfit', sans-serif;
             font-size: 1.5rem;
-            font-weight: 600;
+            font-weight: 700;
+            letter-spacing: -0.03em;
             text-align: center;
             margin-bottom: 8px;
         }
         
         .identify-subtitle {
             font-size: 0.9rem;
-            color: var(--text-secondary);
+            color: var(--text-muted);
             text-align: center;
-            margin-bottom: 32px;
         }
         
         .form-group {
@@ -245,12 +267,12 @@
         
         .form-label {
             display: block;
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             font-weight: 600;
-            color: var(--text-secondary);
+            color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 8px;
+            letter-spacing: 0.08em;
+            margin-bottom: 10px;
         }
         
         .form-input {
@@ -259,20 +281,32 @@
             font-family: 'Inter', sans-serif;
             font-size: 1rem;
             color: var(--text);
-            background: var(--surface);
-            border: 1px solid var(--border);
+            background: transparent;
+            border: 1.5px solid var(--border);
             border-radius: 12px;
-            transition: all 0.15s ease;
+            transition: all 0.2s ease;
+            min-height: 50px;
         }
         
         .form-input:focus {
             outline: none;
             border-color: var(--accent);
-            background: white;
+            box-shadow: 0 0 0 3px var(--accent-soft);
         }
         
         .form-input::placeholder {
             color: var(--text-muted);
+        }
+        
+        /* Hide number spinners */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        input[type="number"] {
+            -moz-appearance: textfield;
         }
         
         .form-select {
@@ -281,25 +315,27 @@
             font-family: 'Inter', sans-serif;
             font-size: 1rem;
             color: var(--text);
-            background: var(--surface);
-            border: 1px solid var(--border);
+            background: transparent;
+            border: 1.5px solid var(--border);
             border-radius: 12px;
             cursor: pointer;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 12px center;
             background-size: 20px;
+            min-height: 50px;
+            transition: all 0.2s ease;
         }
         
         .form-select:focus {
             outline: none;
             border-color: var(--accent);
-            background-color: white;
+            box-shadow: 0 0 0 3px var(--accent-soft);
         }
         
         .form-optional {
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             color: var(--text-muted);
             font-weight: 400;
             text-transform: none;
@@ -545,7 +581,7 @@
         /* ========== LIVE CAPTIONS ========== */
         .live-captions {
             background: var(--surface);
-            border-top: 1px solid var(--border);
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
             padding: 10px 16px;
             flex-shrink: 0;
         }
@@ -804,12 +840,13 @@
         
         .review-section-title {
             font-family: 'Outfit', sans-serif;
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             font-weight: 600;
             color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 16px;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+            text-align: center;
         }
         
         .review-card {
@@ -961,12 +998,12 @@
         }
         
         .noclose-label {
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             font-weight: 600;
             color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 12px;
+            letter-spacing: 0.08em;
+            margin-bottom: 10px;
         }
         
         .objection-select {
@@ -976,16 +1013,24 @@
             font-family: 'Inter', sans-serif;
             font-size: 1rem;
             color: var(--text);
-            background: var(--surface);
-            border: 1px solid var(--border);
+            background: transparent;
+            border: 1.5px solid var(--border);
             border-radius: 12px;
             cursor: pointer;
             margin-bottom: 32px;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 12px center;
             background-size: 20px;
+            min-height: 50px;
+            transition: all 0.2s ease;
+        }
+        
+        .objection-select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
         }
         
         .noclose-actions {
@@ -1074,8 +1119,16 @@
         <!-- Identify Screen -->
         <div class="screen identify-screen active" id="identifyScreen">
             <div class="identify-card">
-                <h1 class="identify-title">Before you start</h1>
-                <p class="identify-subtitle">Enter your details to track your progress</p>
+                <div class="identify-header">
+                    <div class="identify-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                    </div>
+                    <h1 class="identify-title">Agent Setup</h1>
+                    <p class="identify-subtitle">One-time setup to get you started</p>
+                </div>
                 
                 <div class="form-group">
                     <label class="form-label">Your Full Name</label>
@@ -1299,6 +1352,20 @@
             agentName: null,
             agentId: null,
             agency: null,
+            // Client context (from Quick Prep + extracted from call)
+            clientContext: {
+                age: null,
+                sex: 'M',
+                married: 'N',
+                kids: 'N',
+                kidsCount: 0,
+                occupation: null,
+                income: null,
+                weight: null,
+                tobacco: 'N',
+                product: 'whole_life',
+                issue: ''
+            },
             // Caption fade timers
             agentFadeTimer: null,
             callerFadeTimer: null
@@ -1339,7 +1406,26 @@
         // ==================== INIT ====================
         async function init() {
             await loadAgencies();
+            loadClientContext();
             checkExistingIdentity();
+        }
+        
+        function loadClientContext() {
+            const saved = sessionStorage.getItem('coachd_context');
+            if (saved) {
+                try {
+                    const ctx = JSON.parse(saved);
+                    // Merge with defaults
+                    Object.keys(ctx).forEach(key => {
+                        if (ctx[key] !== null && ctx[key] !== undefined) {
+                            state.clientContext[key] = ctx[key];
+                        }
+                    });
+                    console.log('[Context] Loaded from Quick Prep:', state.clientContext);
+                } catch (e) {
+                    console.log('[Context] No saved context found');
+                }
+            }
         }
         
         async function loadAgencies() {
@@ -1371,7 +1457,7 @@
         }
         
         function checkExistingIdentity() {
-            const saved = sessionStorage.getItem('coachd_agent');
+            const saved = localStorage.getItem('coachd_agent');
             if (saved) {
                 try {
                     const data = JSON.parse(saved);
@@ -1404,7 +1490,7 @@
             state.agency = agency;
             state.agentId = agentId || null;
             
-            sessionStorage.setItem('coachd_agent', JSON.stringify({
+            localStorage.setItem('coachd_agent', JSON.stringify({
                 name: state.agentName,
                 agency: state.agency,
                 agentId: state.agentId
@@ -1421,7 +1507,7 @@
         }
         
         function changeAgent() {
-            sessionStorage.removeItem('coachd_agent');
+            localStorage.removeItem('coachd_agent');
             state.agentName = null;
             state.agentId = null;
             state.agency = null;
@@ -1636,7 +1722,11 @@
                 
                 state.ws = new WebSocket(url);
                 
-                state.ws.onopen = () => resolve();
+                state.ws.onopen = () => {
+                    // Send initial context from Quick Prep
+                    sendContextUpdate();
+                    resolve();
+                };
                 state.ws.onerror = (e) => reject(e);
                 state.ws.onclose = () => {
                     if (state.isListening) endCall();
@@ -1679,6 +1769,142 @@
             
             // Update the appropriate caption line
             updateCaption(speaker, text, !isFinal);
+            
+            // Extract client info from final caller transcripts
+            if (isFinal && speaker === 'caller' && text.length > 3) {
+                extractClientInfo(text);
+            }
+        }
+        
+        // ==================== CLIENT INFO EXTRACTION ====================
+        function extractClientInfo(text) {
+            const lower = text.toLowerCase();
+            let updated = false;
+            
+            // Age extraction - "I'm 44", "I am 52 years old", "I'm fifty-two"
+            const agePatterns = [
+                /i(?:'m| am)\s*(\d{1,2})(?:\s*years?\s*old)?/i,
+                /(?:^|\s)(\d{1,2})\s*years?\s*old/i,
+                /age\s*(?:is\s*)?(\d{1,2})/i
+            ];
+            for (const pattern of agePatterns) {
+                const match = text.match(pattern);
+                if (match) {
+                    const age = parseInt(match[1]);
+                    if (age >= 18 && age <= 100 && age !== state.clientContext.age) {
+                        state.clientContext.age = age;
+                        updated = true;
+                        console.log('[Context] Extracted age:', age);
+                    }
+                    break;
+                }
+            }
+            
+            // Marital status - "my wife", "my husband", "I'm married", "I'm single"
+            if (!state.clientContext.married || state.clientContext.married === 'N') {
+                if (/\b(my wife|my husband|my spouse|i'm married|i am married|we're married)\b/i.test(text)) {
+                    state.clientContext.married = 'Y';
+                    updated = true;
+                    console.log('[Context] Extracted married: Y');
+                }
+            }
+            
+            // Kids - "my kids", "my children", "I have 3 kids", "two children"
+            const kidsPatterns = [
+                /(?:have|got)\s*(\d+|one|two|three|four|five|six)\s*(?:kids?|children|child)/i,
+                /(\d+|one|two|three|four|five|six)\s*(?:kids?|children)/i,
+                /\b(my kids|my children|our kids|our children)\b/i
+            ];
+            for (const pattern of kidsPatterns) {
+                const match = text.match(pattern);
+                if (match) {
+                    state.clientContext.kids = 'Y';
+                    // Try to extract count
+                    const numWords = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+                    const countMatch = match[1];
+                    if (countMatch) {
+                        const count = numWords[countMatch.toLowerCase()] || parseInt(countMatch);
+                        if (count && count > 0 && count < 20) {
+                            state.clientContext.kidsCount = count;
+                        }
+                    }
+                    updated = true;
+                    console.log('[Context] Extracted kids:', state.clientContext.kidsCount || 'Y');
+                    break;
+                }
+            }
+            
+            // Occupation - "I work at", "I'm a", "I work as"
+            const jobPatterns = [
+                /i(?:'m| am)\s+(?:a|an)\s+([a-z]+(?:\s+[a-z]+)?)/i,
+                /i\s+work\s+(?:at|for|as)\s+(?:a\s+)?([a-z]+(?:\s+[a-z]+){0,2})/i,
+                /(?:job|work)\s+(?:is|as)\s+(?:a\s+)?([a-z]+(?:\s+[a-z]+)?)/i
+            ];
+            for (const pattern of jobPatterns) {
+                const match = text.match(pattern);
+                if (match && match[1]) {
+                    const occupation = match[1].trim();
+                    // Filter out non-occupation matches
+                    const skipWords = ['not', 'very', 'really', 'just', 'here', 'there', 'good', 'fine', 'okay', 'sure'];
+                    if (occupation.length > 2 && !skipWords.includes(occupation.toLowerCase())) {
+                        state.clientContext.occupation = occupation;
+                        updated = true;
+                        console.log('[Context] Extracted occupation:', occupation);
+                        break;
+                    }
+                }
+            }
+            
+            // Tobacco - "I smoke", "I don't smoke", "non-smoker"
+            if (/\b(i smoke|i do smoke|smoker|i use tobacco)\b/i.test(text)) {
+                state.clientContext.tobacco = 'Y';
+                updated = true;
+                console.log('[Context] Extracted tobacco: Y');
+            } else if (/\b(don't smoke|do not smoke|non-smoker|nonsmoker|no tobacco)\b/i.test(text)) {
+                state.clientContext.tobacco = 'N';
+                updated = true;
+                console.log('[Context] Extracted tobacco: N');
+            }
+            
+            // Send context update to backend if anything changed
+            if (updated) {
+                sendContextUpdate();
+            }
+        }
+        
+        function sendContextUpdate() {
+            if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+                // Format context for backend (matches websocket_handler.py expectations)
+                const contextData = {
+                    product: state.clientContext.product,
+                    age: state.clientContext.age,
+                    occupation: state.clientContext.occupation,
+                    family: buildFamilyString()
+                };
+                
+                state.ws.send(JSON.stringify({
+                    type: 'context',
+                    data: contextData
+                }));
+                console.log('[Context] Sent update to backend:', contextData);
+            }
+        }
+        
+        function buildFamilyString() {
+            const parts = [];
+            if (state.clientContext.married === 'Y') {
+                parts.push('married');
+            } else {
+                parts.push('single');
+            }
+            if (state.clientContext.kids === 'Y') {
+                if (state.clientContext.kidsCount) {
+                    parts.push(`${state.clientContext.kidsCount} kids`);
+                } else {
+                    parts.push('has kids');
+                }
+            }
+            return parts.join(', ') || null;
         }
         
         // ==================== CAPTIONS ====================
