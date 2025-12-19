@@ -1040,7 +1040,7 @@
             </svg>
         </div>
         <h2>Rotate Your Device</h2>
-        <p>ColdRead works best in portrait mode</p>
+        <p>Coachd works best in portrait mode</p>
     </div>
     
     <div class="app" id="app">
@@ -1052,7 +1052,7 @@
                         <path d="M15 18l-6-6 6-6"/>
                     </svg>
                 </button>
-                <span class="logo">ColdRead<span class="ai">.ai</span></span>
+                <span class="logo">Coachd<span class="ai">.ai</span></span>
             </div>
             <div class="header-right">
                 <div class="agent-badge" id="agentBadge">
@@ -1371,7 +1371,7 @@
         }
         
         function checkExistingIdentity() {
-            const saved = sessionStorage.getItem('coldread_agent');
+            const saved = sessionStorage.getItem('coachd_agent');
             if (saved) {
                 try {
                     const data = JSON.parse(saved);
@@ -1404,7 +1404,7 @@
             state.agency = agency;
             state.agentId = agentId || null;
             
-            sessionStorage.setItem('coldread_agent', JSON.stringify({
+            sessionStorage.setItem('coachd_agent', JSON.stringify({
                 name: state.agentName,
                 agency: state.agency,
                 agentId: state.agentId
@@ -1421,7 +1421,7 @@
         }
         
         function changeAgent() {
-            sessionStorage.removeItem('coldread_agent');
+            sessionStorage.removeItem('coachd_agent');
             state.agentName = null;
             state.agentId = null;
             state.agency = null;
