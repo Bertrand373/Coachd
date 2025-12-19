@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: coachd
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: BASE_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: RENDER_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    disk:
+      name: coachd-data
+      mountPath: /data
+      sizeGB: 1

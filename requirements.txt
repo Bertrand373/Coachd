@@ -1,0 +1,36 @@
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+websockets==12.0
+
+# AI & Embeddings
+anthropic>=0.40.0
+sentence-transformers==2.3.1
+
+# Vector Database
+chromadb==0.5.23
+
+# PostgreSQL Database (Usage Tracking)
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
+
+# Document Processing
+pypdf==4.0.1
+python-docx==1.1.0
+
+# Real-time Transcription
+deepgram-sdk==3.1.0
+
+# Twilio (3-way bridge)
+twilio==8.10.0
+
+# HTTP Requests (for external API calls)
+requests==2.31.0
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.6.0
+pydantic-settings==2.1.0
+aiofiles==23.2.1
+gunicorn==21.2.0

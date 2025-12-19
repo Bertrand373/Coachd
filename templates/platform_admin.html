@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Admin | Coachd.ai</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --font-display: 'Outfit', -apple-system, sans-serif;
+            --font-body: 'Inter', -apple-system, sans-serif;
+            --color-bg: #F9FAFB;
+            --color-surface: #FFFFFF;
+            --color-border: rgba(0, 0, 0, 0.06);
+            --color-border-hover: rgba(0, 0, 0, 0.1);
+            --color-text: #1A1A1A;
+            --color-text-secondary: #6B7280;
+            --color-text-muted: #9CA3AF;
+            --color-accent: #60A5FA;
+            --color-accent-soft: rgba(96, 165, 250, 0.1);
+            --color-ready: #10B981;
+            --color-ready-soft: rgba(16, 185, 129, 0.1);
+            --color-warning: #F59E0B;
+            --color-warning-soft: rgba(245, 158, 11, 0.1);
+            --color-error: #EF4444;
+            --color-error-soft: rgba(239, 68, 68, 0.1);
+            --color-info: #3B82F6;
+            --color-info-soft: rgba(59, 130, 246, 0.1);
+            --color-purple: #8B5CF6;
+            --color-purple-soft: rgba(139, 92, 246, 0.1);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-full: 9999px;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: var(--font-body);
+            background: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.5;
+        }
+        
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--color-border);
+            padding: 0 32px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+        
+        .logo-wordmark {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 1.25rem;
+            letter-spacing: -0.02em;
+            text-decoration: none;
+        }
+        
+        .logo-wordmark .name { color: var(--color-text); }
+        .logo-wordmark .suffix { color: var(--color-accent); }
+        
+        .platform-badge {
+            padding: 4px 10px;
+            background: var(--color-text);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-radius: var(--radius-full);
+        }
+        
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .refresh-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .refresh-btn:hover {
+            background: var(--color-border-hover);
+            color: var(--color-text);
+        }
+        
+        .refresh-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+        
+        .refresh-btn.loading svg {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .last-updated {
+            font-size: 0.75rem;
+            color: var(--color-text-secondary);
+        }
+        
+        .main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px;
+        }
+        
+        .page-title {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 6px;
+        }
+        
+        .page-subtitle {
+            color: var(--color-text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 32px;
+        }
+        
+        /* Top Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        
+        .stat-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+        }
+        
+        .stat-card.highlight {
+            background: linear-gradient(135deg, var(--color-ready) 0%, #059669 100%);
+            border: none;
+            color: white;
+        }
+        
+        .stat-card.highlight .stat-label { color: rgba(255,255,255,0.8); }
+        
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+        
+        .stat-icon.green { background: var(--color-ready-soft); color: var(--color-ready); }
+        .stat-icon.blue { background: var(--color-info-soft); color: var(--color-info); }
+        .stat-icon.purple { background: var(--color-purple-soft); color: var(--color-purple); }
+        .stat-icon.orange { background: var(--color-warning-soft); color: var(--color-warning); }
+        .stat-icon.white { background: rgba(255,255,255,0.2); color: white; }
+        
+        .stat-icon svg { width: 20px; height: 20px; }
+        
+        .stat-value {
+            font-family: var(--font-display);
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+        }
+        
+        /* Section Layout */
+        .section {
+            margin-bottom: 32px;
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        
+        .section-title {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        
+        /* Cards */
+        .card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .card-title {
+            font-family: var(--font-display);
+            font-weight: 600;
+        }
+        
+        .card-body {
+            padding: 24px;
+        }
+        
+        /* Two Column Layout */
+        .two-col {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        
+        @media (max-width: 1024px) {
+            .two-col { grid-template-columns: 1fr; }
+        }
+        
+        /* Chart Container */
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        /* Service Cards */
+        .service-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        
+        .service-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+        }
+        
+        .service-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .service-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        
+        .service-icon.deepgram { background: #13EF93; color: #000; }
+        .service-icon.twilio { background: #F22F46; color: white; }
+        .service-icon.claude { background: #D4A574; color: white; }
+        .service-icon.render { background: #46E3B7; color: #000; }
+        
+        .service-name {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        .service-status {
+            font-size: 0.75rem;
+            color: var(--color-accent);
+        }
+        
+        .service-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--color-border);
+        }
+        
+        .metric-row:last-child { border-bottom: none; }
+        
+        .metric-label {
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+        }
+        
+        .metric-value {
+            font-weight: 600;
+            font-family: var(--font-display);
+        }
+        
+        .metric-value.cost { color: var(--color-accent); }
+        
+        /* Info Tooltips */
+        .info-tip {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            margin-left: 6px;
+            background: var(--color-border);
+            border-radius: 50%;
+            cursor: help;
+            flex-shrink: 0;
+        }
+        
+        .info-tip svg {
+            width: 10px;
+            height: 10px;
+            color: var(--color-text-secondary);
+        }
+        
+        .info-tip:hover {
+            background: var(--color-text-muted);
+        }
+        
+        .info-tip:hover svg {
+            color: var(--color-surface);
+        }
+        
+        .info-tip .tip-text {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--color-text);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 400;
+            line-height: 1.4;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            white-space: nowrap;
+            max-width: 220px;
+            white-space: normal;
+            text-align: left;
+            z-index: 1000;
+            transition: opacity 0.15s ease, visibility 0.15s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .info-tip .tip-text::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: var(--color-text);
+        }
+        
+        .info-tip:hover .tip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Tooltip positioning for labels */
+        .metric-label,
+        .stat-label {
+            display: flex;
+            align-items: center;
+        }
+        
+        /* Agency Table */
+        .table-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .agency-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+        
+        .agency-table th,
+        .agency-table td {
+            padding: 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--color-border);
+            white-space: nowrap;
+        }
+        
+        .agency-table th {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-text-secondary);
+            background: var(--color-bg);
+        }
+        
+        .agency-table tr:hover td {
+            background: var(--color-bg);
+        }
+        
+        .agency-name {
+            font-weight: 600;
+        }
+        
+        .mini-bar {
+            height: 6px;
+            background: var(--color-border);
+            border-radius: 3px;
+            overflow: hidden;
+            min-width: 100px;
+        }
+        
+        .mini-bar-fill {
+            height: 100%;
+            background: var(--color-accent);
+            border-radius: 3px;
+        }
+        
+        /* Recent Activity */
+        .activity-list {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--color-border);
+        }
+        
+        .activity-item:last-child { border-bottom: none; }
+        
+        .activity-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .activity-dot.deepgram { background: #13EF93; }
+        .activity-dot.twilio { background: #F22F46; }
+        .activity-dot.claude { background: #D4A574; }
+        
+        .activity-content { flex: 1; }
+        
+        .activity-text {
+            font-size: 0.875rem;
+            margin-bottom: 2px;
+        }
+        
+        .activity-time {
+            font-size: 0.75rem;
+            color: var(--color-text-secondary);
+        }
+        
+        .activity-cost {
+            font-weight: 600;
+            font-family: var(--font-display);
+            color: var(--color-text-secondary);
+        }
+        
+        /* Error State */
+        .error-box {
+            padding: 16px;
+            background: var(--color-error-soft);
+            border-radius: var(--radius-md);
+            color: var(--color-error);
+            font-size: 0.875rem;
+        }
+        
+        /* Loading State */
+        .loading-skeleton {
+            background: linear-gradient(90deg, var(--color-border) 25%, var(--color-bg) 50%, var(--color-border) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: var(--radius-sm);
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        /* Config Check */
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+        
+        .config-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: var(--color-bg);
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+        }
+        
+        .config-item.ok { color: var(--color-ready); }
+        .config-item.missing { color: var(--color-error); }
+        
+        .config-item svg { width: 16px; height: 16px; }
+        
+        /* ========== PAGE LOADER ========== */
+        .page-loader {
+            position: fixed;
+            inset: 0;
+            background: var(--color-bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        
+        .page-loader.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .page-loader-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--color-border);
+            border-top-color: var(--color-accent);
+            border-radius: 50%;
+            animation: pageLoaderSpin 0.8s linear infinite;
+        }
+        
+        @keyframes pageLoaderSpin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header { padding: 0 20px; height: 56px; }
+            .header-left { gap: 12px; }
+            .last-updated { display: none; }
+            .main { padding: 20px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .stat-value { font-size: 1.5rem; }
+            .page-title { font-size: 1.25rem; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <a href="/" class="logo-wordmark">
+                <span class="name">ColdRead</span><span class="suffix">.ai</span>
+            </a>
+            <span class="platform-badge">Platform Admin</span>
+        </div>
+        <div class="header-right">
+            <span class="last-updated" id="lastUpdated">Loading...</span>
+            <button class="refresh-btn" onclick="refreshData()" title="Refresh data">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6M1 20v-6h6"/>
+                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+    
+    <main class="main">
+        <h1 class="page-title">Platform Overview</h1>
+        <p class="page-subtitle">Real-time cost tracking and usage metrics across all services</p>
+        
+        <!-- Top Stats -->
+        <div class="stats-grid">
+            <div class="stat-card highlight">
+                <div class="stat-icon white">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+                    </svg>
+                </div>
+                <div class="stat-value" id="totalCost">$0.00</div>
+                <div class="stat-label">Est. Monthly Cost</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                    </svg>
+                </div>
+                <div class="stat-value" id="totalRequests">0</div>
+                <div class="stat-label">API Requests (30d)<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Total API calls made to all external services (Deepgram, Twilio, Claude) in the last 30 days</span></span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon purple">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                    </svg>
+                </div>
+                <div class="stat-value" id="agencyCount">0</div>
+                <div class="stat-label">Active Agencies<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Insurance agencies currently licensed to use ColdRead. Each agency has their own code, agents, and documents.</span></span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                        <polyline points="22,4 12,14.01 9,11.01"/>
+                    </svg>
+                </div>
+                <div class="stat-value" id="serviceStatus">4/4</div>
+                <div class="stat-label">Services Online<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">External services ColdRead depends on: Deepgram (transcription), Twilio (calls), Claude (AI), and Render (hosting)</span></span></div>
+            </div>
+        </div>
+        
+        <!-- Service Cards -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Service Breakdown</h2>
+            </div>
+            <div class="service-grid" id="serviceGrid">
+                <!-- Deepgram -->
+                <div class="service-card">
+                    <div class="service-header">
+                        <div class="service-icon deepgram">DG</div>
+                        <div>
+                            <div class="service-name">Deepgram</div>
+                            <div class="service-status">Transcription</div>
+                        </div>
+                    </div>
+                    <div class="service-metrics">
+                        <div class="metric-row">
+                            <span class="metric-label">Minutes Used<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Audio minutes transcribed. Deepgram converts speech to text during live calls so AI can analyze the conversation.</span></span></span>
+                            <span class="metric-value" id="dgMinutes">0</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Requests<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Number of transcription sessions started. Each monitored call creates one request.</span></span></span>
+                            <span class="metric-value" id="dgRequests">0</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Est. Cost</span>
+                            <span class="metric-value cost" id="dgCost">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Twilio -->
+                <div class="service-card">
+                    <div class="service-header">
+                        <div class="service-icon twilio">TW</div>
+                        <div>
+                            <div class="service-name">Twilio</div>
+                            <div class="service-status">Voice & SMS</div>
+                        </div>
+                    </div>
+                    <div class="service-metrics">
+                        <div class="metric-row">
+                            <span class="metric-label">Call Minutes<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Total voice call duration. Twilio connects agents to the monitoring system via phone call.</span></span></span>
+                            <span class="metric-value" id="twMinutes">0</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Total Calls<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Number of monitored call sessions initiated through the "Call Me to Start" feature.</span></span></span>
+                            <span class="metric-value" id="twCalls">0</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Actual Cost</span>
+                            <span class="metric-value cost" id="twCost">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Claude -->
+                <div class="service-card">
+                    <div class="service-header">
+                        <div class="service-icon claude">AI</div>
+                        <div>
+                            <div class="service-name">Claude API</div>
+                            <div class="service-status">AI Completions</div>
+                        </div>
+                    </div>
+                    <div class="service-metrics">
+                        <div class="metric-row">
+                            <span class="metric-label">Tokens Used<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Tokens are how AI measures text. ~750 words = 1K tokens. Includes both input (transcript + context) and output (guidance).</span></span></span>
+                            <span class="metric-value" id="clTokens">0</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Requests<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">API calls to Claude. Each chat question or real-time guidance update counts as one request.</span></span></span>
+                            <span class="metric-value" id="clRequests">0</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Est. Cost</span>
+                            <span class="metric-value cost" id="clCost">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Render -->
+                <div class="service-card">
+                    <div class="service-header">
+                        <div class="service-icon render">R</div>
+                        <div>
+                            <div class="service-name">Render</div>
+                            <div class="service-status">Hosting</div>
+                        </div>
+                    </div>
+                    <div class="service-metrics">
+                        <div class="metric-row">
+                            <span class="metric-label">Web Service<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">The server running ColdRead's code. Standard plan = 2GB RAM, 1 CPU, zero downtime deploys.</span></span></span>
+                            <span class="metric-value" id="renderWeb">Standard</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">PostgreSQL<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">The database storing agencies, documents, call logs, and usage data. Persistent storage that survives restarts.</span></span></span>
+                            <span class="metric-value" id="renderDb">$7/mo</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Monthly Cost</span>
+                            <span class="metric-value cost" id="renderCost">$32.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts and Agency Table -->
+        <div class="two-col">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Cost Trends (30 Days)</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="costChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Recent Activity</span>
+                </div>
+                <div class="card-body">
+                    <div class="activity-list" id="activityList">
+                        <div class="activity-item">
+                            <div class="activity-dot deepgram"></div>
+                            <div class="activity-content">
+                                <div class="activity-text">No activity recorded yet</div>
+                                <div class="activity-time">Start making calls to see data</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Agency Breakdown -->
+        <div class="section">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Usage by Agency</span>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <div class="table-scroll">
+                        <table class="agency-table">
+                            <thead>
+                                <tr>
+                                    <th>Agency</th>
+                                    <th>Deepgram</th>
+                                    <th>Twilio</th>
+                                    <th>Claude</th>
+                                    <th>Total Cost</th>
+                                    <th>% of Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="agencyTableBody">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: var(--color-text-secondary);">
+                                        No agency data yet. Usage will appear here as calls are made.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Config Status -->
+        <div class="section">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Configuration Status</span>
+                </div>
+                <div class="card-body">
+                    <div class="config-grid" id="configGrid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Page Loader -->
+    <div class="page-loader" id="pageLoader">
+        <div class="page-loader-spinner"></div>
+    </div>
+    
+    <script>
+        let costChart = null;
+        let refreshInterval = null;
+        
+        // Format currency
+        function formatCurrency(amount) {
+            return '$' + (amount || 0).toFixed(2);
+        }
+        
+        // Format number with commas
+        function formatNumber(num) {
+            return (num || 0).toLocaleString();
+        }
+        
+        // Time ago
+        function timeAgo(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const seconds = Math.floor((now - date) / 1000);
+            
+            if (seconds < 60) return 'just now';
+            if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+            if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+            return Math.floor(seconds / 86400) + 'd ago';
+        }
+        
+        // Load dashboard data
+        async function loadData() {
+            try {
+                const response = await fetch('/api/platform/summary');
+                const data = await response.json();
+                
+                updateDashboard(data);
+                document.getElementById('lastUpdated').textContent = 
+                    'Updated: ' + new Date().toLocaleTimeString();
+                    
+            } catch (error) {
+                console.error('Failed to load data:', error);
+            }
+        }
+        
+        // Update dashboard with data
+        function updateDashboard(data) {
+            const internal = data.internal || {};
+            const external = data.external || {};
+            const byService = internal.by_service || {};
+            const byAgency = internal.by_agency || {};
+            
+            // Total cost
+            let totalCost = internal.total_cost || 0;
+            totalCost += 32; // Add Render (Standard $25 + PostgreSQL $7)
+            document.getElementById('totalCost').textContent = formatCurrency(totalCost);
+            
+            // Total requests
+            let totalRequests = 0;
+            Object.values(byService).forEach(s => totalRequests += s.request_count || 0);
+            document.getElementById('totalRequests').textContent = formatNumber(totalRequests);
+            
+            // Agency count
+            const agencyCount = Object.keys(byAgency).filter(a => a !== 'unknown').length;
+            document.getElementById('agencyCount').textContent = agencyCount || '0';
+            
+            // Service status
+            let servicesOk = 0;
+            if (!external.deepgram?.error) servicesOk++;
+            if (!external.twilio?.error) servicesOk++;
+            if (!external.anthropic?.error) servicesOk++;
+            if (!external.render?.error) servicesOk++;
+            document.getElementById('serviceStatus').textContent = servicesOk + '/4';
+            
+            // Deepgram metrics
+            const dg = byService.deepgram || {};
+            document.getElementById('dgMinutes').textContent = formatNumber(Math.round(dg.total_quantity || 0));
+            document.getElementById('dgRequests').textContent = formatNumber(dg.request_count || 0);
+            document.getElementById('dgCost').textContent = formatCurrency(dg.total_cost);
+            
+            // Twilio metrics - prefer external actual cost
+            const tw = byService.twilio || {};
+            const twActual = external.twilio?.summary?.total_cost;
+            document.getElementById('twMinutes').textContent = formatNumber(Math.round(tw.total_quantity || 0));
+            document.getElementById('twCalls').textContent = formatNumber(tw.request_count || 0);
+            document.getElementById('twCost').textContent = formatCurrency(twActual !== undefined ? twActual : tw.total_cost);
+            
+            // Claude metrics
+            const cl = byService.claude || {};
+            document.getElementById('clTokens').textContent = formatNumber(Math.round(cl.total_quantity || 0));
+            document.getElementById('clRequests').textContent = formatNumber(cl.request_count || 0);
+            document.getElementById('clCost').textContent = formatCurrency(cl.total_cost);
+            
+            // Update chart
+            updateChart(data.daily_trends || []);
+            
+            // Update agency table
+            updateAgencyTable(byAgency, internal.total_cost || 0);
+            
+            // Update config status
+            updateConfigStatus(external);
+        }
+        
+        // Update cost chart
+        function updateChart(dailyData) {
+            const ctx = document.getElementById('costChart').getContext('2d');
+            
+            // Group by date
+            const dateMap = {};
+            dailyData.forEach(d => {
+                if (!dateMap[d.date]) {
+                    dateMap[d.date] = { deepgram: 0, twilio: 0, claude: 0 };
+                }
+                if (d.service && dateMap[d.date][d.service] !== undefined) {
+                    dateMap[d.date][d.service] += d.cost || 0;
+                }
+            });
+            
+            const dates = Object.keys(dateMap).sort();
+            const dgData = dates.map(d => dateMap[d].deepgram);
+            const twData = dates.map(d => dateMap[d].twilio);
+            const clData = dates.map(d => dateMap[d].claude);
+            
+            // Format dates for display
+            const labels = dates.map(d => {
+                const date = new Date(d);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            });
+            
+            if (costChart) {
+                costChart.destroy();
+            }
+            
+            costChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels.length ? labels : ['No data'],
+                    datasets: [
+                        {
+                            label: 'Deepgram',
+                            data: dgData.length ? dgData : [0],
+                            borderColor: '#10B981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            pointHoverBackgroundColor: '#10B981',
+                            pointHoverBorderColor: '#fff',
+                            pointHoverBorderWidth: 2
+                        },
+                        {
+                            label: 'Twilio',
+                            data: twData.length ? twData : [0],
+                            borderColor: '#EF4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            pointHoverBackgroundColor: '#EF4444',
+                            pointHoverBorderColor: '#fff',
+                            pointHoverBorderWidth: 2
+                        },
+                        {
+                            label: 'Claude',
+                            data: clData.length ? clData : [0],
+                            borderColor: '#F59E0B',
+                            backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            pointHoverBackgroundColor: '#F59E0B',
+                            pointHoverBorderColor: '#fff',
+                            pointHoverBorderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                padding: 20,
+                                font: {
+                                    family: "'Inter', sans-serif",
+                                    size: 12
+                                },
+                                color: '#6B7280'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1A1A1A',
+                            titleFont: {
+                                family: "'Inter', sans-serif",
+                                size: 12,
+                                weight: '500'
+                            },
+                            bodyFont: {
+                                family: "'Inter', sans-serif",
+                                size: 12
+                            },
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: true,
+                            boxPadding: 4
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            border: {
+                                display: false
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.04)',
+                                drawTicks: false
+                            },
+                            ticks: {
+                                callback: value => '$' + value.toFixed(2),
+                                font: {
+                                    family: "'Inter', sans-serif",
+                                    size: 11
+                                },
+                                color: '#9CA3AF',
+                                padding: 8
+                            }
+                        },
+                        x: {
+                            border: {
+                                display: false
+                            },
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: {
+                                    family: "'Inter', sans-serif",
+                                    size: 11
+                                },
+                                color: '#9CA3AF',
+                                padding: 8
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update agency table
+        function updateAgencyTable(byAgency, totalCost) {
+            const tbody = document.getElementById('agencyTableBody');
+            
+            const agencies = Object.entries(byAgency).filter(([code]) => code !== 'unknown');
+            
+            if (agencies.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--color-text-secondary);">
+                            No agency data yet. Usage will appear here as calls are made.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            let html = '';
+            agencies.forEach(([code, data]) => {
+                const services = data.services || {};
+                const dgCost = services.deepgram?.cost || 0;
+                const twCost = services.twilio?.cost || 0;
+                const clCost = services.claude?.cost || 0;
+                const agencyCost = data.total_cost || 0;
+                const percent = totalCost > 0 ? (agencyCost / totalCost * 100) : 0;
+                
+                html += `
+                    <tr>
+                        <td><span class="agency-name">${code}</span></td>
+                        <td>${formatCurrency(dgCost)}</td>
+                        <td>${formatCurrency(twCost)}</td>
+                        <td>${formatCurrency(clCost)}</td>
+                        <td><strong>${formatCurrency(agencyCost)}</strong></td>
+                        <td>
+                            <div class="mini-bar">
+                                <div class="mini-bar-fill" style="width: ${Math.min(percent, 100)}%"></div>
+                            </div>
+                            ${percent.toFixed(1)}%
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+        }
+        
+        // Update config status
+        function updateConfigStatus(external) {
+            const grid = document.getElementById('configGrid');
+            
+            const configs = [
+                { name: 'Anthropic API', ok: !external.anthropic?.error },
+                { name: 'Deepgram API', ok: !external.deepgram?.error },
+                { name: 'Twilio API', ok: !external.twilio?.error },
+                { name: 'Render API', ok: !external.render?.error },
+                { name: 'PostgreSQL', ok: true }, // If we got here, it's working
+            ];
+            
+            grid.innerHTML = configs.map(c => `
+                <div class="config-item ${c.ok ? 'ok' : 'missing'}">
+                    ${c.ok 
+                        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>'
+                        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+                    }
+                    ${c.name}
+                </div>
+            `).join('');
+        }
+        
+        // Refresh data
+        async function refreshData() {
+            const btn = document.querySelector('.refresh-btn');
+            btn.classList.add('loading');
+            await loadData();
+            btn.classList.remove('loading');
+        }
+        
+        // Page loader functions
+        function showPageLoader() {
+            document.getElementById('pageLoader').classList.remove('hidden');
+        }
+        
+        function hidePageLoader() {
+            document.getElementById('pageLoader').classList.add('hidden');
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            
+            // Auto-refresh every 60 seconds
+            refreshInterval = setInterval(loadData, 60000);
+        });
+        
+        // Hide loader once page is ready
+        window.addEventListener('load', () => {
+            setTimeout(hidePageLoader, 300);
+        });
+    </script>
+</body>
+</html>
