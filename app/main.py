@@ -1,6 +1,6 @@
 """
 Coachd.ai - Real-time AI Sales Assistant
-Main FastAPI Application with Twilio Bridge Integration
+Main FastAPI Application with Telnyx Bridge Integration
 """
 
 import os
@@ -26,15 +26,18 @@ from .document_processor import DocumentProcessor
 from .rag_engine import RAGEngine, CallContext
 from .websocket_handler import websocket_endpoint
 
-# Twilio imports
-from .twilio_bridge import (
-    is_twilio_configured,
+# Telnyx imports (replaces Twilio)
+from .telnyx_bridge import (
+    is_telnyx_configured,
     initiate_agent_call,
-    generate_agent_conference_twiml,
-    generate_client_conference_twiml,
+    generate_agent_conference_texml,
+    generate_client_conference_texml,
     add_client_to_conference,
+    join_conference,
     end_conference,
-    get_recording_url
+    hangup_call,
+    get_recording_url,
+    _decode_client_state
 )
 from .call_session import session_manager, CallStatus
 
@@ -46,7 +49,7 @@ from .database import (
 from .usage_tracker import (
     log_claude_usage,
     log_deepgram_usage,
-    log_twilio_usage,
+    log_telnyx_usage,
     fetch_all_external_usage,
     get_platform_summary
 )
@@ -76,16 +79,16 @@ class QueryRequest(BaseModel):
     query: str
     context: Optional[Dict[str, Any]] = {}
 
-# Twilio request models
-class TwilioCallRequest(BaseModel):
+# Telnyx request models (renamed from Twilio)
+class TelnyxCallRequest(BaseModel):
     agent_phone: str
 
-class TwilioDialRequest(BaseModel):
+class TelnyxDialRequest(BaseModel):
     session_id: str
     client_phone: str
     agent_caller_id: Optional[str] = None
 
-class TwilioEndRequest(BaseModel):
+class TelnyxEndRequest(BaseModel):
     session_id: str
 
 
@@ -127,11 +130,11 @@ async def lifespan(app: FastAPI):
     else:
         print("⚠ DEEPGRAM_API_KEY not set - transcription disabled")
     
-    # Check Twilio
-    if is_twilio_configured():
-        print("✓ Twilio configured - 3-way bridge ACTIVE")
+    # Check Telnyx (replaces Twilio check)
+    if is_telnyx_configured():
+        print("✓ Telnyx configured - 3-way bridge ACTIVE")
     else:
-        print("⚠ Twilio not configured - using browser mic mode")
+        print("⚠ Telnyx not configured - using browser mic mode")
     
     print("\n" + "="*50)
     print("✅ Coachd.ai Ready")
@@ -148,7 +151,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Coachd.ai",
     description="Real-time AI sales assistant for life insurance agents",
-    version="2.3.0",
+    version="2.4.0",  # Version bump for Telnyx migration
     lifespan=lifespan
 )
 
@@ -182,9 +185,9 @@ async def websocket_route(websocket: WebSocket, client_id: str):
     await websocket_endpoint(websocket, client_id)
 
 
-@app.websocket("/ws/twilio/session/{session_id}")
-async def twilio_session_websocket(websocket: WebSocket, session_id: str):
-    """WebSocket for real-time updates from Twilio calls"""
+@app.websocket("/ws/telnyx/session/{session_id}")
+async def telnyx_session_websocket(websocket: WebSocket, session_id: str):
+    """WebSocket for real-time updates from Telnyx calls"""
     await websocket.accept()
     
     session = await session_manager.get_session(session_id)
@@ -233,9 +236,9 @@ async def chat_page(request: Request):
 @app.get("/call", response_class=HTMLResponse)
 async def call_page(request: Request):
     """Live call interface - auto-selects best mode"""
-    # If Twilio is configured, use Twilio mode
-    if is_twilio_configured():
-        return templates.TemplateResponse("call_twilio.html", {"request": request})
+    # If Telnyx is configured, use Telnyx mode
+    if is_telnyx_configured():
+        return templates.TemplateResponse("call_telnyx.html", {"request": request})
     # Otherwise fall back to browser mic mode
     return templates.TemplateResponse("call_new.html", {"request": request})
 
@@ -246,10 +249,10 @@ async def call_browser_page(request: Request):
     return templates.TemplateResponse("call_new.html", {"request": request})
 
 
-@app.get("/call/twilio", response_class=HTMLResponse)
-async def call_twilio_page(request: Request):
-    """Twilio 3-way bridge mode (explicit)"""
-    return templates.TemplateResponse("call_twilio.html", {"request": request})
+@app.get("/call/telnyx", response_class=HTMLResponse)
+async def call_telnyx_page(request: Request):
+    """Telnyx 3-way bridge mode (explicit)"""
+    return templates.TemplateResponse("call_telnyx.html", {"request": request})
 
 
 @app.get("/call/test", response_class=HTMLResponse)
@@ -303,7 +306,6 @@ async def terms_page(request: Request):
 
 
 # ============ HEALTH CHECK ============
-# Note: /api/status is now handled by status_router with proper service verification
 
 @app.get("/health")
 async def health_check():
@@ -311,7 +313,7 @@ async def health_check():
     return {
         "status": "healthy",
         "app": settings.app_name,
-        "version": "2.3.0",
+        "version": "2.4.0",
         "database": is_db_configured()
     }
 
@@ -322,12 +324,11 @@ async def health_check():
 async def platform_summary():
     """Get complete platform usage summary"""
     if not is_db_configured():
-        # Return structure even without DB for external API data
         return {
             "internal": {"by_service": {}, "by_agency": {}, "total_cost": 0},
             "external": fetch_all_external_usage(),
             "daily_trends": [],
-            "totals": {"estimated_monthly": 0, "twilio_actual": 0},
+            "totals": {"estimated_monthly": 0, "telnyx_actual": 0},
             "database_configured": False,
             "generated_at": datetime.utcnow().isoformat()
         }
@@ -363,88 +364,13 @@ async def platform_external():
     return fetch_all_external_usage()
 
 
-# ============ PLATFORM CONFIG API ============
+# ============ TELNYX API ENDPOINTS ============
 
-@app.get("/api/platform/config/render")
-async def get_render_config(request: Request):
-    """Get Render tier configuration"""
-    # Check admin password
-    admin_pwd = request.headers.get('X-Admin-Password', '')
-    if admin_pwd != settings.admin_password:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    
-    # Get from database with defaults
-    config = get_platform_config('render_tiers', {
-        'web_tier': 'standard',
-        'db_tier': 'starter'
-    })
-    
-    return {
-        "success": True,
-        "data": config
-    }
-
-
-@app.post("/api/platform/config/render")
-async def set_render_config(request: Request):
-    """Set Render tier configuration"""
-    # Check admin password
-    admin_pwd = request.headers.get('X-Admin-Password', '')
-    if admin_pwd != settings.admin_password:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    
-    try:
-        body = await request.json()
-        
-        config = {
-            'web_tier': body.get('web_tier', 'standard'),
-            'db_tier': body.get('db_tier', 'starter')
-        }
-        
-        # Validate tiers
-        valid_web_tiers = ['free', 'starter', 'standard', 'pro', 'pro_plus', 'pro_max', 'pro_ultra']
-        valid_db_tiers = ['free', 'starter', 'standard', 'pro']
-        
-        if config['web_tier'] not in valid_web_tiers:
-            raise HTTPException(status_code=400, detail=f"Invalid web_tier: {config['web_tier']}")
-        if config['db_tier'] not in valid_db_tiers:
-            raise HTTPException(status_code=400, detail=f"Invalid db_tier: {config['db_tier']}")
-        
-        # Save to database
-        success = set_platform_config('render_tiers', config, updated_by='platform_admin')
-        
-        if success:
-            return {"success": True, "data": config}
-        else:
-            raise HTTPException(status_code=500, detail="Failed to save config")
-            
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
-
-@app.get("/api/platform/config")
-async def get_all_config(request: Request):
-    """Get all platform configuration (admin only)"""
-    # Check admin password
-    admin_pwd = request.headers.get('X-Admin-Password', '')
-    if admin_pwd != settings.admin_password:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    
-    from .database import get_all_platform_config
-    
-    return {
-        "success": True,
-        "data": get_all_platform_config()
-    }
-
-
-# ============ TWILIO API ENDPOINTS ============
-
-@app.post("/api/twilio/start-call")
-async def start_twilio_call(data: TwilioCallRequest):
-    """Start a new Twilio-bridged call session"""
-    if not is_twilio_configured():
-        raise HTTPException(status_code=503, detail="Twilio not configured")
+@app.post("/api/telnyx/start-call")
+async def start_telnyx_call(data: TelnyxCallRequest):
+    """Start a new Telnyx-bridged call session"""
+    if not is_telnyx_configured():
+        raise HTTPException(status_code=503, detail="Telnyx not configured")
     
     # Normalize phone number
     agent_phone = data.agent_phone
@@ -464,7 +390,7 @@ async def start_twilio_call(data: TwilioCallRequest):
     
     await session_manager.update_session(
         session.session_id,
-        agent_call_sid=result["call_sid"],
+        agent_call_sid=result["call_control_id"],  # Telnyx uses call_control_id
         status=CallStatus.AGENT_RINGING
     )
     
@@ -475,9 +401,9 @@ async def start_twilio_call(data: TwilioCallRequest):
     }
 
 
-@app.post("/api/twilio/dial-client")
-async def dial_twilio_client(data: TwilioDialRequest):
-    """Add client to existing Twilio conference"""
+@app.post("/api/telnyx/dial-client")
+async def dial_telnyx_client(data: TelnyxDialRequest):
+    """Add client to existing Telnyx conference"""
     session = await session_manager.get_session(data.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -496,26 +422,26 @@ async def dial_twilio_client(data: TwilioDialRequest):
     await session_manager.update_session(
         data.session_id,
         client_phone=client_phone,
-        client_call_sid=result["call_sid"],
+        client_call_sid=result["call_control_id"],  # Telnyx uses call_control_id
         status=CallStatus.CLIENT_RINGING
     )
     
     return {"success": True, "message": f"Dialing {client_phone}..."}
 
 
-@app.post("/api/twilio/end-call")
-async def end_twilio_call(data: TwilioEndRequest):
-    """End a Twilio call session"""
+@app.post("/api/telnyx/end-call")
+async def end_telnyx_call(data: TelnyxEndRequest):
+    """End a Telnyx call session"""
     session = await session_manager.get_session(data.session_id)
     
-    # Log Twilio usage when call ends
+    # Log Telnyx usage when call ends
     if session and session.started_at:
         duration = session.get_duration() or 0
-        log_twilio_usage(
+        log_telnyx_usage(
             call_duration_seconds=duration,
             agency_code=getattr(session, 'agency_code', None),
             session_id=data.session_id,
-            call_sid=session.agent_call_sid
+            call_control_id=session.agent_call_sid
         )
     
     end_conference(data.session_id)
@@ -523,20 +449,88 @@ async def end_twilio_call(data: TwilioEndRequest):
     return {"success": True, "message": "Call ended"}
 
 
-@app.get("/api/twilio/session/{session_id}")
-async def get_twilio_session(session_id: str):
-    """Get Twilio session details"""
+@app.get("/api/telnyx/session/{session_id}")
+async def get_telnyx_session(session_id: str):
+    """Get Telnyx session details"""
     session = await session_manager.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session.to_dict()
 
 
-# ============ TWILIO WEBHOOKS (Called by Twilio) ============
+# ============ TELNYX WEBHOOKS (Called by Telnyx) ============
 
-@app.post("/api/twilio/agent-joined")
-async def twilio_agent_joined(request: Request):
-    """Webhook: Agent has answered, put them in conference"""
+@app.post("/api/telnyx/webhook")
+async def telnyx_webhook(request: Request):
+    """
+    Main Telnyx webhook handler.
+    Telnyx sends all events to a single webhook URL.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return Response(content="", status_code=200)
+    
+    data = body.get("data", {})
+    event_type = data.get("event_type", "")
+    payload = data.get("payload", {})
+    
+    # Extract session_id from client_state
+    client_state = payload.get("client_state", "")
+    state_data = _decode_client_state(client_state) if client_state else {}
+    session_id = state_data.get("session_id")
+    role = state_data.get("role", "unknown")
+    
+    call_control_id = payload.get("call_control_id")
+    
+    # Handle different event types
+    if event_type == "call.answered":
+        if role == "agent":
+            # Agent answered - join them to conference
+            await session_manager.update_session(
+                session_id,
+                status=CallStatus.AGENT_CONNECTED,
+                started_at=datetime.utcnow()
+            )
+            # Join to conference
+            join_conference(call_control_id, session_id)
+            
+        elif role == "client":
+            # Client answered - join them to conference
+            await session_manager.update_session(session_id, status=CallStatus.IN_PROGRESS)
+            join_conference(call_control_id, session_id)
+    
+    elif event_type == "call.hangup":
+        if session_id:
+            session = await session_manager.get_session(session_id)
+            if session:
+                await session_manager.end_session(session_id)
+    
+    elif event_type == "conference.participant.joined":
+        # Could track participants here if needed
+        pass
+    
+    elif event_type == "conference.ended":
+        if session_id:
+            await session_manager.end_session(session_id)
+    
+    elif event_type == "recording.completed":
+        recording_id = payload.get("recording_id")
+        if session_id and recording_id:
+            recording_url = get_recording_url(recording_id)
+            await session_manager.update_session(
+                session_id,
+                recording_sid=recording_id,
+                recording_url=recording_url
+            )
+    
+    return Response(content="", status_code=200)
+
+
+# Legacy webhook endpoints for backwards compatibility / TeXML
+@app.post("/api/telnyx/agent-joined")
+async def telnyx_agent_joined(request: Request):
+    """Webhook: Agent has answered, return TeXML for conference"""
     session_id = request.query_params.get("session_id", "unknown")
     
     await session_manager.update_session(
@@ -545,65 +539,73 @@ async def twilio_agent_joined(request: Request):
         started_at=datetime.utcnow()
     )
     
-    twiml = generate_agent_conference_twiml(session_id)
-    return Response(content=twiml, media_type="application/xml")
+    texml = generate_agent_conference_texml(session_id)
+    return Response(content=texml, media_type="application/xml")
 
 
-@app.post("/api/twilio/client-joined")
-async def twilio_client_joined(request: Request):
-    """Webhook: Client has answered, put them in conference"""
+@app.post("/api/telnyx/client-joined")
+async def telnyx_client_joined(request: Request):
+    """Webhook: Client has answered, return TeXML for conference"""
     session_id = request.query_params.get("session_id", "unknown")
     
     await session_manager.update_session(session_id, status=CallStatus.IN_PROGRESS)
     
-    twiml = generate_client_conference_twiml(session_id)
-    return Response(content=twiml, media_type="application/xml")
+    texml = generate_client_conference_texml(session_id)
+    return Response(content=texml, media_type="application/xml")
 
 
-@app.post("/api/twilio/call-status")
-async def twilio_call_status(request: Request):
-    """Webhook: Call status updates"""
-    form_data = await request.form()
-    call_status = form_data.get("CallStatus")
-    session_id = request.query_params.get("session_id")
-    party = request.query_params.get("party", "agent")
-    
-    if session_id and call_status == "completed":
-        session = await session_manager.get_session(session_id)
-        if session:
-            await session_manager.end_session(session_id)
-    
-    return Response(content="", status_code=200)
-
-
-@app.post("/api/twilio/conference-status")
-async def twilio_conference_status(request: Request):
-    """Webhook: Conference events"""
-    form_data = await request.form()
-    conference_sid = form_data.get("ConferenceSid")
-    session_id = request.query_params.get("session_id")
-    
-    if session_id:
-        await session_manager.update_session(session_id, conference_sid=conference_sid)
+@app.post("/api/telnyx/call-status")
+async def telnyx_call_status(request: Request):
+    """Webhook: Call status updates (TeXML mode)"""
+    try:
+        form_data = await request.form()
+        call_status = form_data.get("CallStatus")
+        session_id = request.query_params.get("session_id")
+        
+        if session_id and call_status == "completed":
+            session = await session_manager.get_session(session_id)
+            if session:
+                await session_manager.end_session(session_id)
+    except Exception:
+        pass
     
     return Response(content="", status_code=200)
 
 
-@app.post("/api/twilio/recording-complete")
-async def twilio_recording_complete(request: Request):
-    """Webhook: Recording finished"""
-    form_data = await request.form()
-    recording_sid = form_data.get("RecordingSid")
-    recording_status = form_data.get("RecordingStatus")
-    session_id = request.query_params.get("session_id")
+@app.post("/api/telnyx/conference-status")
+async def telnyx_conference_status(request: Request):
+    """Webhook: Conference events (TeXML mode)"""
+    try:
+        form_data = await request.form()
+        conference_sid = form_data.get("ConferenceSid")
+        session_id = request.query_params.get("session_id")
+        
+        if session_id:
+            await session_manager.update_session(session_id, conference_sid=conference_sid)
+    except Exception:
+        pass
     
-    if session_id and recording_status == "completed":
-        auth_url = get_recording_url(recording_sid)
-        await session_manager.update_session(
-            session_id,
-            recording_sid=recording_sid,
-            recording_url=auth_url
-        )
+    return Response(content="", status_code=200)
+
+
+@app.post("/api/telnyx/recording-complete")
+async def telnyx_recording_complete(request: Request):
+    """Webhook: Recording finished (TeXML mode)"""
+    try:
+        form_data = await request.form()
+        recording_sid = form_data.get("RecordingSid")
+        recording_status = form_data.get("RecordingStatus")
+        session_id = request.query_params.get("session_id")
+        
+        if session_id and recording_status == "completed":
+            recording_url = get_recording_url(recording_sid)
+            await session_manager.update_session(
+                session_id,
+                recording_sid=recording_sid,
+                recording_url=recording_url
+            )
+    except Exception:
+        pass
     
     return Response(content="", status_code=200)
 
@@ -711,14 +713,17 @@ Bold **key phrases** the agent should say out loud."""
 
 
 @app.post("/api/chat/stream")
-async def chat_stream(data: ChatRequest):
-    """Stream a chat response with true async streaming"""
+async def chat_stream_endpoint(data: ChatRequest):
+    """Stream a chat response with SSE"""
     
     if not settings.anthropic_api_key:
         raise HTTPException(status_code=503, detail="AI service not configured")
     
     async def generate():
         try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+            
             engine = RAGEngine()
             
             context = data.context or {}
@@ -768,17 +773,16 @@ Match your response to what the question actually requires. No filler, no fluff,
 
 Bold **key phrases** the agent should say out loud."""
 
-            # Use asyncio.Queue to bridge sync Claude streaming to async generator
-            chunk_queue = asyncio.Queue()
+            # Track usage
             usage_info = {'input': 0, 'output': 0}
+            chunk_queue = asyncio.Queue()
             loop = asyncio.get_event_loop()
             
             def stream_claude():
-                """Run synchronous Claude streaming in background thread"""
                 try:
-                    with engine.client.messages.stream(
+                    with client.messages.stream(
                         model=settings.claude_model,
-                        max_tokens=1024,
+                        max_tokens=2048,
                         system=system_prompt,
                         messages=messages
                     ) as stream:

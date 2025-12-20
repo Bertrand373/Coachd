@@ -15,10 +15,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     deepgram_api_key: str = ""
     
-    # Twilio Configuration (NEW)
-    twilio_account_sid: str = ""
-    twilio_auth_token: str = ""
-    twilio_phone_number: str = ""
+    # Telnyx Configuration (replaces Twilio)
+    telnyx_api_key: str = ""
+    telnyx_phone_number: str = ""
+    telnyx_connection_id: str = ""  # Required for outbound calls
     base_url: str = "https://coachd.onrender.com"
     
     # Application

@@ -23,10 +23,13 @@ PRICING = {
         'enhanced': 0.0145,
         'base': 0.0125,
     },
-    'twilio': {
-        'call_per_minute': 0.014,  # outbound to US/Canada
-        'phone_number_monthly': 1.15,
-        'recording_per_minute': 0.0025,
+    'telnyx': {
+        # Telnyx pricing (generally 30-50% cheaper than Twilio)
+        'call_per_minute_outbound': 0.007,  # outbound to US/Canada
+        'call_per_minute_inbound': 0.0035,  # inbound
+        'phone_number_monthly': 1.00,
+        'recording_per_minute': 0.002,
+        'conference_per_minute': 0.002,  # per participant per minute
     },
     'claude': {
         'claude-sonnet-4-20250514': {
@@ -58,10 +61,15 @@ def calculate_deepgram_cost(minutes: float, model: str = 'nova-2') -> float:
     return minutes * rate
 
 
-def calculate_twilio_cost(call_minutes: float, recording_minutes: float = 0) -> float:
-    """Calculate Twilio call cost"""
-    call_cost = call_minutes * PRICING['twilio']['call_per_minute']
-    recording_cost = recording_minutes * PRICING['twilio']['recording_per_minute']
+def calculate_telnyx_cost(call_minutes: float, recording_minutes: float = 0, is_inbound: bool = False) -> float:
+    """Calculate Telnyx call cost"""
+    if is_inbound:
+        call_rate = PRICING['telnyx']['call_per_minute_inbound']
+    else:
+        call_rate = PRICING['telnyx']['call_per_minute_outbound']
+    
+    call_cost = call_minutes * call_rate
+    recording_cost = recording_minutes * PRICING['telnyx']['recording_per_minute']
     return call_cost + recording_cost
 
 
@@ -100,20 +108,21 @@ def log_deepgram_usage(
     return cost
 
 
-def log_twilio_usage(
+def log_telnyx_usage(
     call_duration_seconds: float,
     agency_code: Optional[str] = None,
     session_id: Optional[str] = None,
     recording_seconds: float = 0,
-    call_sid: Optional[str] = None
+    call_control_id: Optional[str] = None,
+    is_inbound: bool = False
 ):
-    """Log Twilio call usage"""
+    """Log Telnyx call usage"""
     call_minutes = call_duration_seconds / 60
     recording_minutes = recording_seconds / 60
-    cost = calculate_twilio_cost(call_minutes, recording_minutes)
+    cost = calculate_telnyx_cost(call_minutes, recording_minutes, is_inbound)
     
     log_usage(
-        service='twilio',
+        service='telnyx',
         operation='call',
         quantity=call_minutes,
         unit='minutes',
@@ -121,8 +130,9 @@ def log_twilio_usage(
         agency_code=agency_code,
         session_id=session_id,
         metadata={
-            'call_sid': call_sid,
-            'recording_minutes': recording_minutes
+            'call_control_id': call_control_id,
+            'recording_minutes': recording_minutes,
+            'is_inbound': is_inbound
         }
     )
     
@@ -254,71 +264,86 @@ def fetch_deepgram_usage() -> Dict[str, Any]:
         return {'error': str(e)}
 
 
-def fetch_twilio_usage() -> Dict[str, Any]:
+def fetch_telnyx_usage() -> Dict[str, Any]:
     """
-    Fetch usage from Twilio API
-    https://www.twilio.com/docs/usage/api/usage-record
+    Fetch usage from Telnyx API
+    https://developers.telnyx.com/api/v2/reporting/fetch-all-cdr-requests
     """
-    account_sid = os.getenv('TWILIO_ACCOUNT_SID', '')
-    auth_token = os.getenv('TWILIO_AUTH_TOKEN', '')
+    api_key = os.getenv('TELNYX_API_KEY', '')
     
-    if not account_sid or not auth_token:
-        return {'error': 'Twilio credentials not configured'}
+    if not api_key:
+        return {'error': 'TELNYX_API_KEY not configured'}
     
     try:
-        # Get this month's usage
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Get billing summary
         end_date = datetime.utcnow()
         start_date = end_date.replace(day=1)  # First of month
         
-        response = requests.get(
-            f'https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Usage/Records/ThisMonth.json',
-            auth=(account_sid, auth_token),
+        # Get balance
+        balance_response = requests.get(
+            'https://api.telnyx.com/v2/balance',
+            headers=headers,
             timeout=10
         )
         
-        if response.status_code != 200:
-            return {'error': f'Failed to fetch usage: {response.status_code}'}
+        balance_data = {}
+        if balance_response.status_code == 200:
+            balance_data = balance_response.json()
         
-        data = response.json()
-        usage_records = data.get('usage_records', [])
+        # Get phone numbers for monthly cost
+        numbers_response = requests.get(
+            'https://api.telnyx.com/v2/phone_numbers',
+            headers=headers,
+            params={'page[size]': 100},
+            timeout=10
+        )
         
-        # Parse relevant records
-        summary = {
-            'calls': {},
-            'recordings': {},
-            'sms': {},
-            'phone_numbers': {},
-            'total_cost': 0
-        }
+        phone_numbers = []
+        if numbers_response.status_code == 200:
+            numbers_data = numbers_response.json()
+            phone_numbers = numbers_data.get('data', [])
         
-        for record in usage_records:
-            category = record.get('category', '')
-            price = float(record.get('price', 0) or 0)
-            summary['total_cost'] += price
-            
-            if 'calls' in category.lower():
-                summary['calls'][category] = {
-                    'count': record.get('count', 0),
-                    'usage': record.get('usage', 0),
-                    'unit': record.get('usage_unit', ''),
-                    'price': price
-                }
-            elif 'recording' in category.lower():
-                summary['recordings'][category] = {
-                    'count': record.get('count', 0),
-                    'usage': record.get('usage', 0),
-                    'price': price
-                }
-            elif 'phonenumber' in category.lower():
-                summary['phone_numbers'][category] = {
-                    'count': record.get('count', 0),
-                    'price': price
-                }
+        # Get recent calls for usage
+        calls_response = requests.get(
+            'https://api.telnyx.com/v2/calls',
+            headers=headers,
+            params={
+                'page[size]': 100,
+                'filter[created_at][gte]': start_date.isoformat() + 'Z'
+            },
+            timeout=10
+        )
+        
+        recent_calls = []
+        if calls_response.status_code == 200:
+            calls_data = calls_response.json()
+            recent_calls = calls_data.get('data', [])
+        
+        # Calculate summary
+        total_call_minutes = 0
+        for call in recent_calls:
+            duration = call.get('duration_secs', 0)
+            total_call_minutes += duration / 60
+        
+        phone_number_monthly_cost = len(phone_numbers) * PRICING['telnyx']['phone_number_monthly']
+        call_cost = total_call_minutes * PRICING['telnyx']['call_per_minute_outbound']
         
         return {
             'period': f"{start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}",
-            'summary': summary,
-            'raw_records_count': len(usage_records),
+            'balance': balance_data.get('data', {}).get('balance', 'N/A'),
+            'phone_numbers_count': len(phone_numbers),
+            'total_call_minutes': round(total_call_minutes, 2),
+            'recent_calls_count': len(recent_calls),
+            'summary': {
+                'phone_numbers': phone_number_monthly_cost,
+                'calls': round(call_cost, 4),
+                'total_cost': round(phone_number_monthly_cost + call_cost, 4)
+            },
             'fetched_at': datetime.utcnow().isoformat()
         }
         
@@ -395,7 +420,7 @@ def fetch_all_external_usage() -> Dict[str, Any]:
     return {
         'anthropic': fetch_anthropic_usage(),
         'deepgram': fetch_deepgram_usage(),
-        'twilio': fetch_twilio_usage(),
+        'telnyx': fetch_telnyx_usage(),
         'render': fetch_render_usage(),
         'fetched_at': datetime.utcnow().isoformat()
     }
@@ -439,10 +464,10 @@ def get_platform_summary() -> Dict[str, Any]:
         for svc in internal_summary.values()
     )
     
-    # Twilio external cost (most accurate)
-    twilio_external_cost = 0
-    if 'twilio' in external_data and 'summary' in external_data['twilio']:
-        twilio_external_cost = external_data['twilio']['summary'].get('total_cost', 0)
+    # Telnyx external cost (most accurate)
+    telnyx_external_cost = 0
+    if 'telnyx' in external_data and 'summary' in external_data['telnyx']:
+        telnyx_external_cost = external_data['telnyx']['summary'].get('total_cost', 0)
     
     return {
         'internal': {
@@ -454,7 +479,7 @@ def get_platform_summary() -> Dict[str, Any]:
         'daily_trends': daily_data,
         'totals': {
             'estimated_monthly': total_internal_cost,
-            'twilio_actual': twilio_external_cost
+            'telnyx_actual': telnyx_external_cost
         },
         'generated_at': datetime.utcnow().isoformat()
     }

@@ -1329,7 +1329,7 @@
     </div>
     
     <!-- Delete Confirmation Modal -->
-    <div class="modal-overlay" id="deleteModal">
+    <div class="modal-overlay" id="deleteModal" style="display: none;">
         <div class="modal delete-modal">
             <div class="modal-header">
                 <div class="modal-icon delete-icon">
@@ -1663,11 +1663,21 @@
             pendingDeleteName = docName;
             
             document.getElementById('deleteDocName').textContent = docName;
-            document.getElementById('deleteModal').classList.add('visible');
+            const modal = document.getElementById('deleteModal');
+            modal.style.display = 'flex';
+            // Small delay to trigger CSS transition
+            requestAnimationFrame(() => {
+                modal.classList.add('visible');
+            });
         }
         
         function cancelDelete() {
-            document.getElementById('deleteModal').classList.remove('visible');
+            const modal = document.getElementById('deleteModal');
+            modal.classList.remove('visible');
+            // Hide after transition
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 200);
             pendingDeleteId = null;
             pendingDeleteName = null;
         }
@@ -1676,7 +1686,11 @@
             if (!pendingDeleteId) return;
             
             const id = pendingDeleteId;
-            document.getElementById('deleteModal').classList.remove('visible');
+            const modal = document.getElementById('deleteModal');
+            modal.classList.remove('visible');
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 200);
             
             try {
                 const res = await fetch(`/api/documents/${id}?agency=${currentAgency}`, {

@@ -7,7 +7,7 @@ from .document_processor import DocumentProcessor
 from .vector_db import VectorDatabase, get_vector_db
 from .rag_engine import RAGEngine, get_rag_engine, CallContext
 from .database import init_db, is_db_configured, log_usage
-from .usage_tracker import log_claude_usage, log_deepgram_usage, log_twilio_usage
+from .usage_tracker import log_claude_usage, log_deepgram_usage, log_telnyx_usage
 from .call_state_machine import (
     CallStateMachine,
     ClientProfile,
@@ -36,7 +36,7 @@ __all__ = [
     "log_usage",
     "log_claude_usage",
     "log_deepgram_usage",
-    "log_twilio_usage",
+    "log_telnyx_usage",
     # Call State Machine
     "CallStateMachine",
     "ClientProfile",
