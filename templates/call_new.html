@@ -2214,16 +2214,23 @@
         // These handle real-time token streaming for ~1 second first-visible latency
         
         function handleGuidanceStart(msg) {
-            // First chunk arrived - show panel immediately
-            state.streamingGuidance = msg.chunk || '';
-            state.guidanceRenderPending = false;
-            
-            // Check if guidance is already showing (prevents flash on rapid re-triggers)
+            const newContent = msg.full_text || msg.chunk || '';
             const alreadyShowing = dom.guidanceState.classList.contains('active');
             
-            dom.listeningState.style.display = 'none';
+            // ANTI-FLASH: Only skip small chunks if panel is VISIBLE with substantial content
+            // If panel is hidden, always show new content
+            if (alreadyShowing) {
+                const currentContent = dom.guidanceText.textContent || '';
+                if (currentContent.length > 100 && newContent.length < 50) {
+                    console.log('[Guidance] Skipping small chunk, keeping current content');
+                    return;
+                }
+            }
             
-            // Update text content
+            state.streamingGuidance = newContent;
+            state.guidanceRenderPending = false;
+            
+            dom.listeningState.style.display = 'none';
             dom.guidanceText.innerHTML = formatGuidanceText(state.streamingGuidance);
             
             // Only animate and notify if panel wasn't already showing
@@ -2238,10 +2245,13 @@
         }
         
         function handleGuidanceChunk(msg) {
-            // Accumulate text
-            state.streamingGuidance = msg.full_text || (state.streamingGuidance + (msg.chunk || ''));
+            // Use full_text from server (accumulated) for reliable display
+            const newContent = msg.full_text || (state.streamingGuidance + (msg.chunk || ''));
             
-            // Throttle DOM updates to animation frames for smooth rendering
+            // Always update streaming guidance state
+            state.streamingGuidance = newContent;
+            
+            // Update DOM
             if (!state.guidanceRenderPending) {
                 state.guidanceRenderPending = true;
                 requestAnimationFrame(() => {
@@ -2252,7 +2262,6 @@
         }
         
         function handleGuidanceComplete(msg) {
-            // Final text received
             const fullText = msg.guidance || state.streamingGuidance || '';
             const sayThis = extractSayThis(fullText);
             
@@ -2263,9 +2272,12 @@
                 timestamp: Date.now()
             });
             
-            // Final render - ensure clean display
+            // Final render - use extracted text if substantial, otherwise full text
             state.guidanceRenderPending = false;
-            dom.guidanceText.innerHTML = formatGuidanceText(sayThis);
+            const displayText = (sayThis && sayThis.length > 10) ? sayThis : fullText;
+            if (displayText) {
+                dom.guidanceText.innerHTML = formatGuidanceText(displayText);
+            }
             
             // Clear streaming state
             state.streamingGuidance = '';
@@ -2345,6 +2357,10 @@
             dom.guidanceState.classList.remove('active');
             dom.listeningState.style.display = 'flex';
             hidePriceObjectionButton();
+            
+            // CRITICAL: Clear text content so anti-flash logic doesn't block new guidance
+            dom.guidanceText.innerHTML = '';
+            state.streamingGuidance = '';
         }
         
         // ==================== CALL CONTROLS ====================
