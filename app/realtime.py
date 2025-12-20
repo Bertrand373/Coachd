@@ -349,6 +349,9 @@ class RealtimeTranscriber:
             if now - self.last_guidance_time < 1.0:
                 return
             print(f"[RT] 🔥 HOT TRIGGER detected: '{latest_transcript[:50]}...' - generating immediately", flush=True)
+            # CRITICAL: Add this transcript to buffer so guidance has content to work with
+            if latest_transcript.strip():
+                self.transcript_buffer = latest_transcript  # Use triggering text directly
             self._schedule_async(self._generate_guidance())
             return
         
@@ -388,14 +391,21 @@ class RealtimeTranscriber:
         
     async def _generate_guidance(self):
         """Generate AI guidance based on transcript buffer with timeout"""
-        if not self.rag_engine or not self.transcript_buffer.strip():
+        if not self.rag_engine:
+            print(f"[RT] No RAG engine, skipping guidance", flush=True)
+            return
+        if not self.transcript_buffer.strip():
+            print(f"[RT] Empty transcript buffer, skipping guidance", flush=True)
             return
         
         if self._generating_guidance:
+            print(f"[RT] Already generating guidance, skipping", flush=True)
             return
             
         self._generating_guidance = True
         self.last_guidance_time = time.time()
+        
+        print(f"[RT] Starting guidance generation for: '{self.transcript_buffer[:60]}...'", flush=True)
         
         try:
             # Run guidance generation with timeout
@@ -416,6 +426,8 @@ class RealtimeTranscriber:
             
         except Exception as e:
             print(f"[RT] Guidance generation error: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
         finally:
             self._generating_guidance = False
     
@@ -424,6 +436,8 @@ class RealtimeTranscriber:
         try:
             full_text = ""
             first_chunk = True
+            
+            print(f"[RT] Calling RAG engine for guidance...", flush=True)
             
             # Stream guidance using the new streaming method
             # Pass session_id for Claude usage tracking
@@ -436,6 +450,9 @@ class RealtimeTranscriber:
                 if chunk:
                     full_text += chunk
                     
+                    if first_chunk:
+                        print(f"[RT] First guidance chunk received, streaming to client...", flush=True)
+                    
                     # Send each chunk immediately over WebSocket
                     await self.on_guidance({
                         "type": "guidance_chunk" if not first_chunk else "guidance_start",
@@ -447,17 +464,22 @@ class RealtimeTranscriber:
             
             # Send completion signal
             if full_text:
+                print(f"[RT] Guidance complete ({len(full_text)} chars), sending completion signal", flush=True)
                 await self.on_guidance({
                     "type": "guidance_complete",
                     "guidance": full_text,
                     "trigger": self.transcript_buffer[-100:] if len(self.transcript_buffer) > 100 else self.transcript_buffer
                 })
                 return None  # Already sent via streaming
+            else:
+                print(f"[RT] WARNING: No guidance text generated", flush=True)
             
             return None
             
         except Exception as e:
             print(f"[RT] Error in guidance generation: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
             return None
             
     def update_context(self, context_data: dict):
