@@ -1085,6 +1085,187 @@
         
         .noclose-btn:hover { opacity: 0.9; }
         
+        /* ========== CALL TYPE SELECTOR ========== */
+        .call-type-selector {
+            width: 100%;
+            max-width: 280px;
+            margin-bottom: 24px;
+        }
+
+        .call-type-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .call-type-buttons {
+            display: flex;
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .call-type-btn {
+            flex: 1;
+            padding: 12px 8px;
+            background: transparent;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .call-type-btn.active {
+            background: var(--bg);
+            color: var(--text);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .call-type-btn:hover:not(.active) { color: var(--text); }
+
+        .call-type-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        /* ========== PHASE INDICATOR ========== */
+        .phase-indicator {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .phase-indicator.visible { display: flex; }
+
+        .phase-progress {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .phase-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--border);
+            transition: all 0.2s ease;
+        }
+
+        .phase-dot.completed { background: var(--success); }
+        .phase-dot.current { 
+            background: var(--accent); 
+            transform: scale(1.4);
+            box-shadow: 0 0 0 2px var(--accent-soft);
+        }
+
+        .phase-text {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .phase-name {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .phase-nav {
+            display: flex;
+            gap: 4px;
+            margin-left: 8px;
+        }
+
+        .phase-nav-btn {
+            width: 26px;
+            height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.15s ease;
+        }
+
+        .phase-nav-btn:hover { background: var(--border); color: var(--text); }
+        .phase-nav-btn:active { transform: scale(0.95); }
+        .phase-nav-btn svg { width: 14px; height: 14px; }
+
+        /* ========== DOWN-CLOSE BUTTON ========== */
+        .down-close-container {
+            display: none;
+            padding: 12px 20px;
+            background: rgba(245, 158, 11, 0.08);
+            border-top: 1px solid rgba(245, 158, 11, 0.2);
+            flex-shrink: 0;
+        }
+
+        .down-close-container.visible { display: block; }
+
+        .down-close-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 14px 20px;
+            background: #F59E0B;
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+        }
+
+        .down-close-btn:hover { 
+            background: #D97706;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        }
+
+        .down-close-btn:active { transform: translateY(0); }
+        .down-close-btn svg { width: 18px; height: 18px; }
+
+        .down-close-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .down-close-level { font-weight: 600; color: var(--text); }
+
+        /* ========== WORD STREAMING ========== */
+        .guidance-text .word {
+            opacity: 0;
+            display: inline;
+            transition: opacity 0.08s ease;
+        }
+
+        .guidance-text .word.visible { opacity: 1; }
+
         /* ========== RESPONSIVE ========== */
         @media (min-width: 768px) {
             .header { padding: 20px 32px; }
@@ -1185,6 +1366,17 @@
             </div>
             <h1 class="start-title">Live Call</h1>
             <p class="start-subtitle">Real-time coaching to help you close</p>
+            
+            <!-- Call Type Selector -->
+            <div class="call-type-selector">
+                <div class="call-type-label">Call Type</div>
+                <div class="call-type-buttons">
+                    <button class="call-type-btn active" data-type="phone" onclick="Coachd.setCallType('phone')">Phone</button>
+                    <button class="call-type-btn" data-type="presentation" onclick="Coachd.setCallType('presentation')">Presentation</button>
+                </div>
+                <div class="call-type-hint" id="callTypeHint">Setting appointments (2-3 min)</div>
+            </div>
+            
             <button class="start-btn" id="startBtn" onclick="Coachd.startCall()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                     <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
@@ -1198,6 +1390,20 @@
         
         <!-- Call Screen -->
         <div class="screen call-screen" id="callScreen">
+            <!-- Phase Indicator (presentation mode only) -->
+            <div class="phase-indicator" id="phaseIndicator">
+                <div class="phase-progress" id="phaseProgress"></div>
+                <span class="phase-text">Phase <span id="phaseNumber">1</span>/14: <span class="phase-name" id="phaseName">Rapport</span></span>
+                <div class="phase-nav">
+                    <button class="phase-nav-btn" onclick="Coachd.prevPhase()" title="Previous">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                    </button>
+                    <button class="phase-nav-btn" onclick="Coachd.nextPhase()" title="Next">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                    </button>
+                </div>
+            </div>
+            
             <div class="teleprompter" id="teleprompter" onclick="Coachd.dismissGuidance()">
                 <div class="listening-state" id="listeningState">
                     <div class="listening-bars">
@@ -1213,6 +1419,18 @@
                 <div class="guidance-state" id="guidanceState">
                     <div class="guidance-text" id="guidanceText"></div>
                     <div class="dismiss-hint">tap anywhere to dismiss</div>
+                </div>
+            </div>
+            
+            <!-- Down-Close Button (price objection) -->
+            <div class="down-close-container" id="downCloseContainer">
+                <button class="down-close-btn" onclick="Coachd.doDownClose()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+                    Down-Close: Reduce Coverage
+                </button>
+                <div class="down-close-info">
+                    <span>Level: <span class="down-close-level" id="downCloseLevel">1/7</span></span>
+                    <span id="downCloseAmount">$30k Final Expense</span>
                 </div>
             </div>
             
@@ -1349,8 +1567,38 @@
             streamSpeed: 18,  // DEPRECATED: No longer used for guidance (now instant fade-in)
             audioNotifyFreq: 880,
             audioNotifyDuration: 0.15,
-            captionFadeDelay: 4000 // Fade caption after 4s of silence
+            captionFadeDelay: 4000, // Fade caption after 4s of silence
+            wordStreamDelay: 35 // ms per word for streaming
         };
+        
+        // Presentation phases (Globe Life specific)
+        const PHASES = [
+            { id: 'rapport', name: 'Rapport' },
+            { id: 'introduction', name: 'Introduction' },
+            { id: 'company_credibility', name: 'Company' },
+            { id: 'accidental_death', name: 'Accidental Death' },
+            { id: 'referrals', name: 'Referrals' },
+            { id: 'insurance_types', name: 'Insurance Types' },
+            { id: 'needs_analysis', name: 'Needs Analysis' },
+            { id: 'final_expense', name: 'Final Expense' },
+            { id: 'income_protection', name: 'Income Protection' },
+            { id: 'mortgage', name: 'Mortgage' },
+            { id: 'college', name: 'College' },
+            { id: 'recap', name: 'Recap' },
+            { id: 'close', name: 'Close' },
+            { id: 'application', name: 'Application' }
+        ];
+        
+        // Down-close levels (Globe Life specific)
+        const DOWN_CLOSE_LEVELS = [
+            { final_expense: 30000, income_years: 2, label: 'Full Coverage - Option 1' },
+            { final_expense: 30000, income_years: 2, label: 'Full Coverage - Option 2' },
+            { final_expense: 15000, income_years: 2, label: 'Reduced Final Expense' },
+            { final_expense: 10000, income_years: 2, label: 'Basic Final Expense' },
+            { final_expense: 7500, income_years: 2, label: 'Minimum Final Expense' },
+            { final_expense: 7500, income_years: 1, label: 'Reduced Income Protection' },
+            { final_expense: 7500, income_years: 1, label: 'Pick Most Important' }
+        ];
         
         // ==================== STATE ====================
         const state = {
@@ -1390,7 +1638,12 @@
             },
             // Caption fade timers
             agentFadeTimer: null,
-            callerFadeTimer: null
+            callerFadeTimer: null,
+            // Call type and phase tracking
+            callType: 'phone',
+            currentPhase: 0,
+            downCloseLevel: 0,
+            showDownClose: false
         };
         
         // ==================== DOM ====================
@@ -1422,7 +1675,16 @@
             get agentCaptionLine() { return document.getElementById('agentCaptionLine'); },
             get callerCaptionLine() { return document.getElementById('callerCaptionLine'); },
             get agentCaptionText() { return document.getElementById('agentCaptionText'); },
-            get callerCaptionText() { return document.getElementById('callerCaptionText'); }
+            get callerCaptionText() { return document.getElementById('callerCaptionText'); },
+            // Phase and down-close elements
+            get phaseIndicator() { return document.getElementById('phaseIndicator'); },
+            get phaseProgress() { return document.getElementById('phaseProgress'); },
+            get phaseNumber() { return document.getElementById('phaseNumber'); },
+            get phaseName() { return document.getElementById('phaseName'); },
+            get downCloseContainer() { return document.getElementById('downCloseContainer'); },
+            get downCloseLevel() { return document.getElementById('downCloseLevel'); },
+            get downCloseAmount() { return document.getElementById('downCloseAmount'); },
+            get callTypeHint() { return document.getElementById('callTypeHint'); }
         };
         
         // ==================== INIT ====================
@@ -1430,6 +1692,7 @@
             await loadAgencies();
             loadClientContext();
             checkExistingIdentity();
+            buildPhaseProgress();
         }
         
         function loadClientContext() {
@@ -1538,6 +1801,124 @@
             dom.agentId.value = '';
             dom.agencySelect.value = '';
             showScreen('identifyScreen');
+        }
+        
+        // ==================== CALL TYPE ====================
+        function setCallType(type) {
+            state.callType = type;
+            document.querySelectorAll('.call-type-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.type === type);
+            });
+            const hints = { phone: 'Setting appointments (2-3 min)', presentation: 'Full sales presentation (30-45 min)' };
+            dom.callTypeHint.textContent = hints[type];
+        }
+        
+        // ==================== PHASE TRACKING ====================
+        function buildPhaseProgress() {
+            let html = '';
+            for (let i = 0; i < PHASES.length; i++) {
+                html += `<div class="phase-dot" data-phase="${i}"></div>`;
+            }
+            dom.phaseProgress.innerHTML = html;
+        }
+        
+        function updatePhaseUI() {
+            if (state.callType !== 'presentation') {
+                dom.phaseIndicator.classList.remove('visible');
+                return;
+            }
+            dom.phaseIndicator.classList.add('visible');
+            const phase = PHASES[state.currentPhase];
+            dom.phaseNumber.textContent = state.currentPhase + 1;
+            dom.phaseName.textContent = phase.name;
+            document.querySelectorAll('.phase-dot').forEach((dot, i) => {
+                dot.classList.remove('completed', 'current');
+                if (i < state.currentPhase) dot.classList.add('completed');
+                if (i === state.currentPhase) dot.classList.add('current');
+            });
+        }
+        
+        function nextPhase() {
+            if (state.currentPhase < PHASES.length - 1) {
+                state.currentPhase++;
+                updatePhaseUI();
+                sendPhaseUpdate();
+            }
+        }
+        
+        function prevPhase() {
+            if (state.currentPhase > 0) {
+                state.currentPhase--;
+                updatePhaseUI();
+                sendPhaseUpdate();
+            }
+        }
+        
+        function sendPhaseUpdate() {
+            if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+                state.ws.send(JSON.stringify({ type: 'phase_update', data: { phase: PHASES[state.currentPhase].id, phase_index: state.currentPhase } }));
+            }
+        }
+        
+        // ==================== DOWN-CLOSE ====================
+        function showDownCloseButton() {
+            state.showDownClose = true;
+            dom.downCloseContainer.classList.add('visible');
+            updateDownCloseUI();
+        }
+        
+        function hideDownCloseButton() {
+            state.showDownClose = false;
+            dom.downCloseContainer.classList.remove('visible');
+        }
+        
+        function updateDownCloseUI() {
+            const level = DOWN_CLOSE_LEVELS[state.downCloseLevel];
+            dom.downCloseLevel.textContent = `${state.downCloseLevel + 1}/${DOWN_CLOSE_LEVELS.length}`;
+            dom.downCloseAmount.textContent = `$${(level.final_expense / 1000).toFixed(0)}k FE, ${level.income_years}yr Income`;
+        }
+        
+        function doDownClose() {
+            if (state.downCloseLevel < DOWN_CLOSE_LEVELS.length - 1) {
+                state.downCloseLevel++;
+                updateDownCloseUI();
+                if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+                    state.ws.send(JSON.stringify({ type: 'down_close', data: { level: state.downCloseLevel, ...DOWN_CLOSE_LEVELS[state.downCloseLevel] } }));
+                }
+                const script = getDownCloseScript(state.downCloseLevel);
+                if (script) showGuidanceStreaming(script);
+            }
+        }
+        
+        function getDownCloseScript(level) {
+            const scripts = [
+                null,
+                "Let's adjust Final Expense to $15,000. That should still cover funeral costs. Your income protection stays the same. Does this feel better?",
+                "Here's what we can do: adjust Final Expense to $10,000. That's right in the middle of current costs. Everything else stays the same. Feeling better?",
+                "Let's adjust Final Expense to $7,500 - the basic funeral cost. Leave everything else to protect your family. You've got to be feeling better about that, right?",
+                "We'll keep Final Expense at $7,500 and adjust income protection from 2 years to 1 year. When things get better, you can always increase. Feeling much better now, right?",
+                "If something happened unexpectedly, which of these could your family go without for now, knowing we can add it later? [Wait for answer]"
+            ];
+            return scripts[level] || null;
+        }
+        
+        // ==================== STREAMING GUIDANCE ====================
+        function showGuidanceStreaming(text) {
+            if (state.streamInterval) { clearInterval(state.streamInterval); state.streamInterval = null; }
+            dom.listeningState.style.display = 'none';
+            dom.guidanceState.classList.remove('active');
+            dom.guidanceText.innerHTML = '';
+            
+            const words = text.split(/\s+/).filter(w => w);
+            words.forEach((word, i) => {
+                const span = document.createElement('span');
+                span.className = 'word';
+                span.textContent = word + ' ';
+                dom.guidanceText.appendChild(span);
+                setTimeout(() => span.classList.add('visible'), i * CONFIG.wordStreamDelay);
+            });
+            
+            requestAnimationFrame(() => dom.guidanceState.classList.add('active'));
         }
         
         // ==================== UTILS ====================
@@ -2151,6 +2532,7 @@
             
             dom.guidanceState.classList.remove('active');
             dom.listeningState.style.display = 'flex';
+            hideDownCloseButton();
         }
         
         // ==================== CALL CONTROLS ====================
@@ -2175,12 +2557,16 @@
                 state.guidanceHistory = [];
                 state.selectedTipIndex = null;
                 state.callOutcome = null;
+                state.currentPhase = 0;
+                state.downCloseLevel = 0;
                 
                 // Reset captions
                 resetCaptions();
                 
                 showScreen('callScreen');
                 startTimer();
+                updatePhaseUI();
+                hideDownCloseButton();
                 
                 if ('wakeLock' in navigator) {
                     try { await navigator.wakeLock.request('screen'); } catch (e) {}
@@ -2269,7 +2655,9 @@
                 agency: state.agency,
                 agent_name: state.agentName,
                 agent_id: state.agentId,
-                call_type: 'browser_test'
+                call_type: state.callType,
+                final_phase: state.callType === 'presentation' ? PHASES[state.currentPhase].id : null,
+                down_close_level: state.downCloseLevel
             };
             
             try {
@@ -2293,6 +2681,8 @@
             dom.finalObjection.value = '';
             state.guidanceHistory = [];
             state.selectedTipIndex = null;
+            state.currentPhase = 0;
+            state.downCloseLevel = 0;
             dismissGuidance();
             resetCaptions();
             showScreen('startScreen');
@@ -2332,6 +2722,10 @@
             handleBack,
             saveIdentity,
             changeAgent,
+            setCallType,
+            nextPhase,
+            prevPhase,
+            doDownClose,
             getState: () => state
         };
     })();
