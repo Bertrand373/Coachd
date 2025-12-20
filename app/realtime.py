@@ -133,7 +133,7 @@ class RealtimeTranscriber:
                 language="en-US",
                 smart_format=True,
                 interim_results=True,
-                utterance_end_ms="400",   # Was 1000 - faster sentence boundaries
+                utterance_end_ms="500",   # Was 1000 - faster sentence boundaries
                 endpointing=300,          # Deepgram minimum is 300ms
                 sample_rate=self.SAMPLE_RATE,
                 encoding="linear16",
