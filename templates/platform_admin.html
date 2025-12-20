@@ -302,6 +302,70 @@
         .service-icon.claude { background: #D4A574; color: white; }
         .service-icon.render { background: #46E3B7; color: #000; }
         
+        /* Render Tier Selector */
+        .tier-select {
+            padding: 6px 10px;
+            background: var(--color-bg);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-family: var(--font-body);
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--color-text);
+            cursor: pointer;
+            min-width: 130px;
+            transition: all 0.15s ease;
+        }
+        
+        .tier-select:hover {
+            border-color: var(--color-border-hover);
+        }
+        
+        .tier-select:focus {
+            outline: none;
+            border-color: var(--color-accent);
+            box-shadow: 0 0 0 2px var(--color-accent-soft);
+        }
+        
+        /* Render Specs Row */
+        .render-specs {
+            background: var(--color-bg);
+            border-radius: var(--radius-sm);
+            padding: 8px 12px !important;
+            margin: -4px 0 4px 0;
+            gap: 16px;
+            justify-content: flex-start !important;
+        }
+        
+        .spec-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .spec-label {
+            font-size: 0.7rem;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        
+        .spec-value {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--color-text);
+        }
+        
+        .total-row {
+            margin-top: 8px;
+            padding-top: 12px !important;
+            border-top: 1px solid var(--color-border);
+        }
+        
+        .render-card .metric-value.cost {
+            font-size: 1.1rem;
+        }
+        
         .service-name {
             font-family: var(--font-display);
             font-weight: 600;
@@ -406,6 +470,23 @@
         .info-tip:hover .tip-text {
             visibility: visible;
             opacity: 1;
+        }
+        
+        /* White tooltip for highlight cards */
+        .info-tip.white-tip {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .info-tip.white-tip svg {
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .info-tip.white-tip:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .info-tip.white-tip:hover svg {
+            color: white;
         }
         
         /* Tooltip positioning for labels */
@@ -603,7 +684,9 @@
         .modal-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -611,7 +694,12 @@
             opacity: 0;
             visibility: hidden;
             transition: all 0.2s ease;
-            padding: 24px;
+            /* Mobile-first padding with safe areas */
+            padding: 20px;
+            padding-top: max(20px, env(safe-area-inset-top));
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+            padding-left: max(20px, env(safe-area-inset-left));
+            padding-right: max(20px, env(safe-area-inset-right));
         }
         
         .modal-overlay.visible {
@@ -621,10 +709,11 @@
         
         .modal {
             width: 100%;
-            max-width: 360px;
+            max-width: 340px;
             background: var(--color-surface);
             border-radius: var(--radius-lg);
-            padding: 28px;
+            padding: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
             transform: scale(0.95);
             transition: transform 0.2s ease;
         }
@@ -636,53 +725,60 @@
         .modal-header {
             display: flex;
             align-items: center;
-            gap: 16px;
-            margin-bottom: 16px;
+            gap: 12px;
+            margin-bottom: 6px;
         }
         
         .modal-icon {
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             background: var(--color-accent-soft);
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--color-accent);
+            flex-shrink: 0;
+        }
+        
+        .modal-icon svg {
+            width: 18px;
+            height: 18px;
         }
         
         .modal-title {
             font-family: var(--font-display);
-            font-size: 1.25rem;
+            font-size: 1.125rem;
             font-weight: 600;
             color: var(--color-text);
         }
         
         .modal-desc {
-            font-size: 0.875rem;
+            font-size: 0.8125rem;
             color: var(--color-text-secondary);
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             line-height: 1.5;
         }
         
         .modal-input {
             width: 100%;
-            padding: 14px 16px;
-            background: transparent;
+            padding: 12px 14px;
+            background: var(--color-bg);
             border: 1.5px solid var(--color-border);
             border-radius: var(--radius-md);
             font-family: var(--font-body);
             font-size: 1rem;
             color: var(--color-text);
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             transition: all 0.2s ease;
-            min-height: 50px;
+            min-height: 46px;
         }
         
         .modal-input:focus {
             outline: none;
             border-color: var(--color-accent);
             box-shadow: 0 0 0 3px var(--color-accent-soft);
+            background: var(--color-surface);
         }
         
         .modal-input::placeholder {
@@ -691,12 +787,12 @@
         
         .modal-actions {
             display: flex;
-            gap: 12px;
+            gap: 10px;
         }
         
         .modal-btn {
             flex: 1;
-            padding: 12px 20px;
+            padding: 12px 16px;
             font-family: var(--font-body);
             font-size: 0.875rem;
             font-weight: 500;
@@ -706,13 +802,13 @@
         }
         
         .modal-btn-cancel {
-            background: var(--color-bg);
+            background: transparent;
             border: 1px solid var(--color-border);
             color: var(--color-text-secondary);
         }
         
         .modal-btn-cancel:hover {
-            background: var(--color-border);
+            background: var(--color-bg);
             color: var(--color-text);
         }
         
@@ -720,10 +816,59 @@
             background: var(--color-text);
             border: none;
             color: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
         }
         
         .modal-btn-confirm:hover {
-            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .modal-btn-confirm:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Desktop modal adjustments */
+        @media (min-width: 768px) {
+            .modal-overlay {
+                padding: 32px;
+            }
+            
+            .modal {
+                padding: 28px;
+                max-width: 360px;
+            }
+            
+            .modal-icon {
+                width: 40px;
+                height: 40px;
+                border-radius: var(--radius-md);
+            }
+            
+            .modal-icon svg {
+                width: 20px;
+                height: 20px;
+            }
+            
+            .modal-title {
+                font-size: 1.25rem;
+            }
+            
+            .modal-desc {
+                font-size: 0.875rem;
+                margin-bottom: 20px;
+            }
+            
+            .modal-input {
+                padding: 14px 16px;
+                min-height: 50px;
+                margin-bottom: 24px;
+            }
+            
+            .modal-actions {
+                gap: 12px;
+            }
         }
         
         /* Hide content until authenticated */
@@ -775,7 +920,7 @@
                     </svg>
                 </div>
                 <div class="stat-value" id="totalCost">$0.00</div>
-                <div class="stat-label">Est. Monthly Cost</div>
+                <div class="stat-label">Est. Monthly Cost<span class="info-tip white-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Total estimated monthly cost: Render infrastructure (fixed) + API usage (variable based on calls/minutes). Adjust Render tier in the Render card below.</span></span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon blue">
@@ -891,25 +1036,46 @@
                 </div>
                 
                 <!-- Render -->
-                <div class="service-card">
+                <div class="service-card render-card">
                     <div class="service-header">
                         <div class="service-icon render">R</div>
                         <div>
                             <div class="service-name">Render</div>
-                            <div class="service-status">Hosting</div>
+                            <div class="service-status">Hosting Infrastructure</div>
                         </div>
                     </div>
                     <div class="service-metrics">
                         <div class="metric-row">
-                            <span class="metric-label">Web Service<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">The server running Coachd's code. Standard plan = 2GB RAM, 1 CPU, zero downtime deploys.</span></span></span>
-                            <span class="metric-value" id="renderWeb">Standard</span>
+                            <span class="metric-label">Web Service<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">The server running Coachd's backend. Higher tiers = more RAM/CPU for handling concurrent calls and faster AI responses.</span></span></span>
+                            <select class="tier-select" id="webTierSelect" onchange="updateRenderCost()">
+                                <option value="free">Free ($0)</option>
+                                <option value="starter">Starter ($7)</option>
+                                <option value="standard" selected>Standard ($25)</option>
+                                <option value="pro">Pro ($85)</option>
+                                <option value="pro_plus">Pro Plus ($175)</option>
+                                <option value="pro_max">Pro Max ($225)</option>
+                                <option value="pro_ultra">Pro Ultra ($450)</option>
+                            </select>
+                        </div>
+                        <div class="metric-row render-specs">
+                            <span class="spec-item"><span class="spec-label">RAM</span><span class="spec-value" id="webRam">2 GB</span></span>
+                            <span class="spec-item"><span class="spec-label">CPU</span><span class="spec-value" id="webCpu">1</span></span>
                         </div>
                         <div class="metric-row">
-                            <span class="metric-label">PostgreSQL<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">The database storing agencies, documents, call logs, and usage data. Persistent storage that survives restarts.</span></span></span>
-                            <span class="metric-value" id="renderDb">$7/mo</span>
+                            <span class="metric-label">PostgreSQL<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Database for agencies, documents, call logs, and usage tracking. Starter is sufficient for most use cases.</span></span></span>
+                            <select class="tier-select" id="dbTierSelect" onchange="updateRenderCost()">
+                                <option value="free">Free ($0)</option>
+                                <option value="starter" selected>Starter ($7)</option>
+                                <option value="standard">Standard ($20)</option>
+                                <option value="pro">Pro ($95)</option>
+                            </select>
                         </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Monthly Cost</span>
+                        <div class="metric-row render-specs">
+                            <span class="spec-item"><span class="spec-label">Storage</span><span class="spec-value" id="dbStorage">1 GB</span></span>
+                            <span class="spec-item"><span class="spec-label">RAM</span><span class="spec-value" id="dbRam">256 MB</span></span>
+                        </div>
+                        <div class="metric-row total-row">
+                            <span class="metric-label">Monthly Cost<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Combined cost of web service + database. This is a fixed monthly cost regardless of usage.</span></span></span>
                             <span class="metric-value cost" id="renderCost">$32.00</span>
                         </div>
                     </div>
@@ -1026,6 +1192,129 @@
         // Uses same password as admin.html (COACHD_ADMIN_PASSWORD)
         let adminPassword = sessionStorage.getItem('adminPassword') || '';
         
+        // ==================== RENDER TIER CONFIG ====================
+        // Server-side persistence via API (not localStorage)
+        const RENDER_WEB_TIERS = {
+            free:      { price: 0,   ram: '512 MB', cpu: '0.1' },
+            starter:   { price: 7,   ram: '512 MB', cpu: '0.5' },
+            standard:  { price: 25,  ram: '2 GB',   cpu: '1' },
+            pro:       { price: 85,  ram: '4 GB',   cpu: '2' },
+            pro_plus:  { price: 175, ram: '8 GB',   cpu: '4' },
+            pro_max:   { price: 225, ram: '16 GB',  cpu: '4' },
+            pro_ultra: { price: 450, ram: '32 GB',  cpu: '8' }
+        };
+        
+        const RENDER_DB_TIERS = {
+            free:     { price: 0,  storage: '1 GB',  ram: '256 MB' },
+            starter:  { price: 7,  storage: '1 GB',  ram: '256 MB' },
+            standard: { price: 20, storage: '16 GB', ram: '1 GB' },
+            pro:      { price: 95, storage: '64 GB', ram: '4 GB' }
+        };
+        
+        // Current selections (loaded from server)
+        let selectedWebTier = 'standard';
+        let selectedDbTier = 'starter';
+        let renderConfigLoaded = false;
+        
+        async function loadRenderConfig() {
+            try {
+                const res = await fetch('/api/platform/config/render', {
+                    headers: { 'X-Admin-Password': adminPassword }
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    selectedWebTier = data.data?.web_tier || 'standard';
+                    selectedDbTier = data.data?.db_tier || 'starter';
+                    renderConfigLoaded = true;
+                    
+                    // Update UI
+                    const webSelect = document.getElementById('webTierSelect');
+                    const dbSelect = document.getElementById('dbTierSelect');
+                    if (webSelect) webSelect.value = selectedWebTier;
+                    if (dbSelect) dbSelect.value = selectedDbTier;
+                    
+                    updateRenderSpecs();
+                    console.log('Render config loaded:', selectedWebTier, selectedDbTier);
+                }
+            } catch (e) {
+                console.error('Failed to load Render config:', e);
+            }
+        }
+        
+        async function saveRenderConfig() {
+            try {
+                const res = await fetch('/api/platform/config/render', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Password': adminPassword
+                    },
+                    body: JSON.stringify({
+                        web_tier: selectedWebTier,
+                        db_tier: selectedDbTier
+                    })
+                });
+                
+                if (res.ok) {
+                    console.log('Render config saved');
+                } else {
+                    console.error('Failed to save Render config');
+                }
+            } catch (e) {
+                console.error('Error saving Render config:', e);
+            }
+        }
+        
+        function initRenderTiers() {
+            // Load from server (async)
+            loadRenderConfig();
+            
+            // Set initial UI while waiting for server
+            updateRenderSpecs();
+        }
+        
+        function updateRenderCost() {
+            const webSelect = document.getElementById('webTierSelect');
+            const dbSelect = document.getElementById('dbTierSelect');
+            
+            selectedWebTier = webSelect.value;
+            selectedDbTier = dbSelect.value;
+            
+            // Save to server (async, don't wait)
+            saveRenderConfig();
+            
+            updateRenderSpecs();
+            
+            // Recalculate total if dashboard is loaded
+            if (typeof lastDashboardData !== 'undefined' && lastDashboardData) {
+                updateDashboard(lastDashboardData);
+            }
+        }
+        
+        function updateRenderSpecs() {
+            const webTier = RENDER_WEB_TIERS[selectedWebTier];
+            const dbTier = RENDER_DB_TIERS[selectedDbTier];
+            
+            // Update web specs
+            document.getElementById('webRam').textContent = webTier.ram;
+            document.getElementById('webCpu').textContent = webTier.cpu;
+            
+            // Update DB specs
+            document.getElementById('dbStorage').textContent = dbTier.storage;
+            document.getElementById('dbRam').textContent = dbTier.ram;
+            
+            // Update total cost
+            const totalRenderCost = webTier.price + dbTier.price;
+            document.getElementById('renderCost').textContent = formatCurrency(totalRenderCost);
+        }
+        
+        function getRenderMonthlyCost() {
+            const webTier = RENDER_WEB_TIERS[selectedWebTier];
+            const dbTier = RENDER_DB_TIERS[selectedDbTier];
+            return webTier.price + dbTier.price;
+        }
+        
         async function initAuth() {
             if (!adminPassword) {
                 document.getElementById('passwordInput').focus();
@@ -1056,6 +1345,7 @@
         function unlockPage() {
             document.body.classList.remove('locked');
             document.getElementById('passwordModal').classList.remove('visible');
+            initRenderTiers();
             loadData();
             refreshInterval = setInterval(loadData, 60000);
         }
@@ -1095,6 +1385,7 @@
         // ==================== DASHBOARD ====================
         let costChart = null;
         let refreshInterval = null;
+        let lastDashboardData = null; // Store for recalculation on tier change
         
         // Format currency
         function formatCurrency(amount) {
@@ -1124,6 +1415,7 @@
                 const response = await fetch('/api/platform/summary');
                 const data = await response.json();
                 
+                lastDashboardData = data; // Store for recalculation
                 updateDashboard(data);
                 document.getElementById('lastUpdated').textContent = 
                     'Updated: ' + new Date().toLocaleTimeString();
@@ -1140,9 +1432,9 @@
             const byService = internal.by_service || {};
             const byAgency = internal.by_agency || {};
             
-            // Total cost
+            // Total cost (usage + Render infrastructure)
             let totalCost = internal.total_cost || 0;
-            totalCost += 32; // Add Render (Standard $25 + PostgreSQL $7)
+            totalCost += getRenderMonthlyCost(); // Dynamic based on selected tiers
             document.getElementById('totalCost').textContent = formatCurrency(totalCost);
             
             // Total requests

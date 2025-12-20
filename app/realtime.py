@@ -7,16 +7,19 @@ Production-ready with:
 - Timeout on AI guidance generation
 - Proper error handling
 - OPTIMIZED: Reduced latency for real-time feel
+- BILLING: Complete usage tracking for Deepgram and Claude
 """
 
 import asyncio
 import time
 import sys
+import uuid
 from typing import Optional, Callable
 from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions
 
 from .config import settings
 from .rag_engine import get_rag_engine, CallContext
+from .usage_tracker import log_deepgram_usage
 
 
 class RealtimeTranscriber:
@@ -38,6 +41,11 @@ class RealtimeTranscriber:
     # Note: Hot triggers use 1.0s cooldown (hardcoded in _check_for_guidance_trigger)
     MIN_WORDS_FOR_GUIDANCE = 12      # Minimum words before non-trigger guidance
     
+    # Audio format constants for duration calculation
+    SAMPLE_RATE = 16000  # 16kHz
+    BYTES_PER_SAMPLE = 2  # 16-bit linear PCM = 2 bytes per sample
+    CHANNELS = 1  # Mono
+    
     def __init__(self, on_transcript: Callable, on_guidance: Callable):
         self.on_transcript = on_transcript
         self.on_guidance = on_guidance
@@ -49,9 +57,15 @@ class RealtimeTranscriber:
         self.is_running = False
         self._loop = None
         self._generating_guidance = False  # Prevent concurrent guidance generation
-        self._agency = None  # Track agency for RAG context
+        self._agency = None  # Track agency for RAG context and billing
         
-        print(f"[RT] RealtimeTranscriber initialized (cooldown={self.GUIDANCE_COOLDOWN_SECONDS}s, min_words={self.MIN_WORDS_FOR_GUIDANCE})", flush=True)
+        # ============ USAGE TRACKING ============
+        self._session_id = str(uuid.uuid4())  # Unique session ID for tracking
+        self._session_start_time = None  # Track when session started
+        self._total_audio_bytes = 0  # Track total audio bytes received
+        self._audio_duration_seconds = 0.0  # Calculated audio duration
+        
+        print(f"[RT] RealtimeTranscriber initialized (session={self._session_id[:8]}, cooldown={self.GUIDANCE_COOLDOWN_SECONDS}s, min_words={self.MIN_WORDS_FOR_GUIDANCE})", flush=True)
         
         # Initialize Deepgram client
         if settings.deepgram_api_key:
@@ -64,6 +78,11 @@ class RealtimeTranscriber:
         else:
             self.deepgram = None
             print("[RT] WARNING: DEEPGRAM_API_KEY not set - transcription disabled", flush=True)
+    
+    @property
+    def session_id(self) -> str:
+        """Get the session ID for this transcription session"""
+        return self._session_id
         
     async def start(self) -> bool:
         """Start the Deepgram live transcription"""
@@ -80,6 +99,11 @@ class RealtimeTranscriber:
         # CRITICAL: Capture the event loop for thread-safe callbacks
         self._loop = asyncio.get_running_loop()
         print(f"[RT] Event loop captured", flush=True)
+        
+        # Reset usage tracking for new session
+        self._session_start_time = time.time()
+        self._total_audio_bytes = 0
+        self._audio_duration_seconds = 0.0
             
         # Initialize RAG engine (non-critical - can run without it)
         try:
@@ -109,11 +133,11 @@ class RealtimeTranscriber:
                 language="en-US",
                 smart_format=True,
                 interim_results=True,
-                utterance_end_ms="400",   # Was 500 - faster sentence boundaries
-                endpointing=200,          # Was 300 - react faster to pauses
-                sample_rate=16000,
+                utterance_end_ms="400",   # Was 1000 - faster sentence boundaries
+                endpointing=300,          # Deepgram minimum is 300ms
+                sample_rate=self.SAMPLE_RATE,
                 encoding="linear16",
-                channels=1
+                channels=self.CHANNELS
             )
             print(f"[RT] Options configured, starting connection...", flush=True)
             
@@ -164,6 +188,9 @@ class RealtimeTranscriber:
         """Send audio chunk to Deepgram (non-blocking)"""
         if not self.connection or not self.is_running:
             return
+        
+        # Track audio bytes for usage calculation
+        self._total_audio_bytes += len(audio_data)
             
         try:
             # Run in executor to prevent blocking the event loop
@@ -180,9 +207,12 @@ class RealtimeTranscriber:
             self.is_running = False
             
     async def stop(self):
-        """Stop the transcription (non-blocking)"""
+        """Stop the transcription and log usage"""
         print(f"[RT] stop() called", flush=True)
         self.is_running = False
+        
+        # Calculate and log Deepgram usage
+        self._log_session_usage()
         
         if self.connection:
             try:
@@ -191,38 +221,62 @@ class RealtimeTranscriber:
                     loop.run_in_executor(None, self.connection.finish),
                     timeout=3.0
                 )
-                print(f"[RT] Connection finished", flush=True)
+                print(f"[RT] connection.finish() completed", flush=True)
             except asyncio.TimeoutError:
                 print(f"[RT] WARNING: connection.finish() timed out", flush=True)
             except Exception as e:
-                print(f"[RT] Error closing connection: {e}", flush=True)
+                print(f"[RT] Error finishing connection: {e}", flush=True)
             finally:
                 self.connection = None
-
+    
+    def _log_session_usage(self):
+        """Calculate and log Deepgram usage for this session"""
+        if self._total_audio_bytes == 0:
+            print(f"[RT] No audio data to log for session {self._session_id[:8]}", flush=True)
+            return
+        
+        # Calculate audio duration from bytes
+        # Formula: bytes / (sample_rate * bytes_per_sample * channels) = seconds
+        bytes_per_second = self.SAMPLE_RATE * self.BYTES_PER_SAMPLE * self.CHANNELS
+        self._audio_duration_seconds = self._total_audio_bytes / bytes_per_second
+        
+        # Also calculate wall-clock duration for comparison
+        wall_clock_seconds = 0.0
+        if self._session_start_time:
+            wall_clock_seconds = time.time() - self._session_start_time
+        
+        print(f"[RT] Session {self._session_id[:8]} usage: "
+              f"audio={self._audio_duration_seconds:.1f}s ({self._total_audio_bytes:,} bytes), "
+              f"wall={wall_clock_seconds:.1f}s, "
+              f"agency={self._agency}", flush=True)
+        
+        # Log to database for billing
+        cost = log_deepgram_usage(
+            duration_seconds=self._audio_duration_seconds,
+            agency_code=self._agency,
+            session_id=self._session_id,
+            model='nova-2'
+        )
+        
+        print(f"[RT] Logged Deepgram usage: {self._audio_duration_seconds:.1f}s = ${cost:.4f}", flush=True)
+    
     def _schedule_async(self, coro):
-        """
-        Safely schedule an async coroutine from a sync/thread context.
-        This is the key fix for Deepgram callbacks running in separate threads.
-        """
+        """Schedule a coroutine to run in the main event loop (thread-safe)"""
         if self._loop and self._loop.is_running():
             asyncio.run_coroutine_threadsafe(coro, self._loop)
         else:
-            print("[RT] WARNING: Event loop not available for callback", flush=True)
+            print(f"[RT] WARNING: Cannot schedule async - no running loop", flush=True)
     
     def _handle_transcript(self, *args, **kwargs):
-        """Handle incoming transcript from Deepgram"""
+        """Handle incoming transcripts from Deepgram (called from Deepgram's thread)"""
         try:
             result = kwargs.get('result') or (args[1] if len(args) > 1 else None)
             
-            if not result:
-                return
-            
-            # Extract transcript from result
-            if hasattr(result, 'channel') and result.channel:
+            if result:
                 alternatives = result.channel.alternatives
-                if alternatives and len(alternatives) > 0:
+                if alternatives:
                     transcript = alternatives[0].transcript
-                    is_final = getattr(result, 'is_final', False)
+                    is_final = result.is_final
                     
                     if transcript:
                         # Send transcript to client (thread-safe)
@@ -330,6 +384,9 @@ class RealtimeTranscriber:
         self.is_running = False
         print("[RT] Deepgram connection closed", flush=True)
         
+        # Log usage on unexpected close
+        self._log_session_usage()
+        
     async def _generate_guidance(self):
         """Generate AI guidance based on transcript buffer with timeout"""
         if not self.rag_engine or not self.transcript_buffer.strip():
@@ -370,10 +427,12 @@ class RealtimeTranscriber:
             first_chunk = True
             
             # Stream guidance using the new streaming method
+            # Pass session_id for Claude usage tracking
             for chunk in self.rag_engine.generate_guidance_stream(
                 self.transcript_buffer,
                 self.call_context,
-                agency=self._agency
+                agency=self._agency,
+                session_id=self._session_id
             ):
                 if chunk:
                     full_text += chunk
@@ -414,3 +473,18 @@ class RealtimeTranscriber:
             self.call_context.client_family = context_data["client_family"]
         if "agency" in context_data:
             self._agency = context_data["agency"]
+            print(f"[RT] Agency set to: {self._agency} for session {self._session_id[:8]}", flush=True)
+    
+    def get_session_stats(self) -> dict:
+        """Get current session statistics for debugging/monitoring"""
+        bytes_per_second = self.SAMPLE_RATE * self.BYTES_PER_SAMPLE * self.CHANNELS
+        current_duration = self._total_audio_bytes / bytes_per_second if self._total_audio_bytes > 0 else 0
+        
+        return {
+            "session_id": self._session_id,
+            "agency": self._agency,
+            "audio_bytes": self._total_audio_bytes,
+            "audio_duration_seconds": current_duration,
+            "is_running": self.is_running,
+            "transcript_buffer_words": len(self.transcript_buffer.split())
+        }

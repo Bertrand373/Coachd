@@ -37,7 +37,10 @@ from .twilio_bridge import (
 from .call_session import session_manager, CallStatus
 
 # Database and usage tracking
-from .database import init_db, is_db_configured, get_usage_summary, get_usage_by_agency, get_daily_usage, get_recent_logs
+from .database import (
+    init_db, is_db_configured, get_usage_summary, get_usage_by_agency, 
+    get_daily_usage, get_recent_logs, get_platform_config, set_platform_config
+)
 from .usage_tracker import (
     log_claude_usage,
     log_deepgram_usage,
@@ -356,6 +359,81 @@ async def platform_logs(limit: int = 100, agency: Optional[str] = None):
 async def platform_external():
     """Fetch fresh data from external service APIs"""
     return fetch_all_external_usage()
+
+
+# ============ PLATFORM CONFIG API ============
+
+@app.get("/api/platform/config/render")
+async def get_render_config(request: Request):
+    """Get Render tier configuration"""
+    # Check admin password
+    admin_pwd = request.headers.get('X-Admin-Password', '')
+    if admin_pwd != settings.admin_password:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    # Get from database with defaults
+    config = get_platform_config('render_tiers', {
+        'web_tier': 'standard',
+        'db_tier': 'starter'
+    })
+    
+    return {
+        "success": True,
+        "data": config
+    }
+
+
+@app.post("/api/platform/config/render")
+async def set_render_config(request: Request):
+    """Set Render tier configuration"""
+    # Check admin password
+    admin_pwd = request.headers.get('X-Admin-Password', '')
+    if admin_pwd != settings.admin_password:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    try:
+        body = await request.json()
+        
+        config = {
+            'web_tier': body.get('web_tier', 'standard'),
+            'db_tier': body.get('db_tier', 'starter')
+        }
+        
+        # Validate tiers
+        valid_web_tiers = ['free', 'starter', 'standard', 'pro', 'pro_plus', 'pro_max', 'pro_ultra']
+        valid_db_tiers = ['free', 'starter', 'standard', 'pro']
+        
+        if config['web_tier'] not in valid_web_tiers:
+            raise HTTPException(status_code=400, detail=f"Invalid web_tier: {config['web_tier']}")
+        if config['db_tier'] not in valid_db_tiers:
+            raise HTTPException(status_code=400, detail=f"Invalid db_tier: {config['db_tier']}")
+        
+        # Save to database
+        success = set_platform_config('render_tiers', config, updated_by='platform_admin')
+        
+        if success:
+            return {"success": True, "data": config}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save config")
+            
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+
+@app.get("/api/platform/config")
+async def get_all_config(request: Request):
+    """Get all platform configuration (admin only)"""
+    # Check admin password
+    admin_pwd = request.headers.get('X-Admin-Password', '')
+    if admin_pwd != settings.admin_password:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from .database import get_all_platform_config
+    
+    return {
+        "success": True,
+        "data": get_all_platform_config()
+    }
 
 
 # ============ TWILIO API ENDPOINTS ============

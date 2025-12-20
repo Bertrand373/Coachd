@@ -1,14 +1,17 @@
 """
 Coachd RAG Engine
 Retrieval-Augmented Generation for sales guidance
+
+With complete usage tracking for billing accuracy.
 """
 
 from anthropic import Anthropic
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Generator
 from dataclasses import dataclass
 
 from .vector_db import get_vector_db
 from .config import settings
+from .usage_tracker import log_claude_usage
 
 
 @dataclass
@@ -138,7 +141,8 @@ Be direct. Be specific. Help them close."""
         self, 
         transcript_chunk: str, 
         call_context: CallContext,
-        agency: Optional[str] = None
+        agency: Optional[str] = None,
+        session_id: Optional[str] = None
     ) -> str:
         """Generate guidance based on a transcript chunk and call context"""
         
@@ -168,14 +172,25 @@ Be direct. Be specific. Help them close."""
             messages=messages
         )
         
+        # Log Claude usage for billing
+        log_claude_usage(
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+            agency_code=agency,
+            session_id=session_id,
+            model=settings.claude_model,
+            operation='guidance'
+        )
+        
         return response.content[0].text
 
     def generate_guidance_stream(
         self, 
         transcript_chunk: str, 
         call_context: CallContext,
-        agency: Optional[str] = None
-    ):
+        agency: Optional[str] = None,
+        session_id: Optional[str] = None
+    ) -> Generator[str, None, None]:
         """
         Stream guidance tokens as they're generated.
         Yields text chunks for real-time display.
@@ -204,7 +219,7 @@ Be direct. Be specific. Help them close."""
             }
         ]
         
-        # Stream the response
+        # Stream the response and track usage
         with self.client.messages.stream(
             model=settings.claude_model,
             max_tokens=500,
@@ -213,11 +228,25 @@ Be direct. Be specific. Help them close."""
         ) as stream:
             for text in stream.text_stream:
                 yield text
+            
+            # Get final message to access usage stats
+            final_message = stream.get_final_message()
+            
+            # Log Claude usage for billing
+            log_claude_usage(
+                input_tokens=final_message.usage.input_tokens,
+                output_tokens=final_message.usage.output_tokens,
+                agency_code=agency,
+                session_id=session_id,
+                model=settings.claude_model,
+                operation='guidance_stream'
+            )
     
     def analyze_transcript(
         self, 
         transcript: str,
-        agency: Optional[str] = None
+        agency: Optional[str] = None,
+        session_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Analyze a transcript chunk for objections and buying signals"""
         
@@ -247,6 +276,16 @@ Respond in JSON format:
             model=settings.claude_model,
             max_tokens=200,
             messages=messages
+        )
+        
+        # Log Claude usage for billing
+        log_claude_usage(
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+            agency_code=agency,
+            session_id=session_id,
+            model=settings.claude_model,
+            operation='analyze_transcript'
         )
         
         try:

@@ -108,6 +108,19 @@ class ExternalServiceSnapshot(Base):
     period_end = Column(DateTime, nullable=True)
 
 
+class PlatformConfig(Base):
+    """
+    Platform-wide configuration settings (persisted server-side)
+    Used for things like Render tier selections that affect billing calculations.
+    """
+    __tablename__ = "platform_config"
+    
+    key = Column(String(100), primary_key=True)
+    value = Column(Text)  # JSON string for complex values
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by = Column(String(100), nullable=True)  # Optional: track who changed it
+
+
 def init_db():
     """Initialize database tables"""
     if engine:
@@ -346,3 +359,93 @@ def get_recent_logs(limit: int = 100, agency_code: Optional[str] = None) -> List
     except Exception as e:
         print(f"Failed to get recent logs: {e}")
         return []
+
+
+# ============ PLATFORM CONFIG FUNCTIONS ============
+
+def get_platform_config(key: str, default: Any = None) -> Any:
+    """
+    Get a platform config value by key.
+    Returns parsed JSON if the value is JSON, otherwise returns raw string.
+    """
+    if not is_db_configured():
+        return default
+    
+    try:
+        with get_db() as db:
+            config = db.query(PlatformConfig).filter(PlatformConfig.key == key).first()
+            
+            if config is None:
+                return default
+            
+            # Try to parse as JSON
+            try:
+                return json.loads(config.value)
+            except (json.JSONDecodeError, TypeError):
+                return config.value
+                
+    except Exception as e:
+        print(f"Failed to get platform config '{key}': {e}")
+        return default
+
+
+def set_platform_config(key: str, value: Any, updated_by: Optional[str] = None) -> bool:
+    """
+    Set a platform config value.
+    Complex values (dicts, lists) are stored as JSON strings.
+    """
+    if not is_db_configured():
+        return False
+    
+    try:
+        # Convert to JSON string if not already a string
+        if isinstance(value, (dict, list)):
+            value_str = json.dumps(value)
+        else:
+            value_str = str(value)
+        
+        with get_db() as db:
+            config = db.query(PlatformConfig).filter(PlatformConfig.key == key).first()
+            
+            if config:
+                # Update existing
+                config.value = value_str
+                config.updated_at = datetime.utcnow()
+                config.updated_by = updated_by
+            else:
+                # Create new
+                config = PlatformConfig(
+                    key=key,
+                    value=value_str,
+                    updated_by=updated_by
+                )
+                db.add(config)
+            
+            return True
+            
+    except Exception as e:
+        print(f"Failed to set platform config '{key}': {e}")
+        return False
+
+
+def get_all_platform_config() -> Dict[str, Any]:
+    """Get all platform config values as a dictionary."""
+    if not is_db_configured():
+        return {}
+    
+    try:
+        with get_db() as db:
+            configs = db.query(PlatformConfig).all()
+            
+            result = {}
+            for config in configs:
+                try:
+                    result[config.key] = json.loads(config.value)
+                except (json.JSONDecodeError, TypeError):
+                    result[config.key] = config.value
+            
+            return result
+            
+    except Exception as e:
+        print(f"Failed to get all platform config: {e}")
+        return {}

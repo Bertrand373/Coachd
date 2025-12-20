@@ -675,7 +675,9 @@
         .modal-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -683,6 +685,12 @@
             opacity: 0;
             visibility: hidden;
             transition: all 0.2s ease;
+            /* Mobile-first padding with safe areas */
+            padding: 20px;
+            padding-top: max(20px, env(safe-area-inset-top));
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+            padding-left: max(20px, env(safe-area-inset-left));
+            padding-right: max(20px, env(safe-area-inset-right));
         }
         
         .modal-overlay.visible {
@@ -693,10 +701,10 @@
         .modal {
             background: var(--color-bg);
             border-radius: var(--radius-lg);
-            padding: 32px;
+            padding: 24px;
             width: 100%;
-            max-width: 380px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            max-width: 340px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
             transform: scale(0.95);
             transition: transform 0.2s ease;
         }
@@ -709,52 +717,59 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         
         .modal-icon {
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             background: var(--color-blue-soft);
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--color-blue-dark);
+            flex-shrink: 0;
+        }
+        
+        .modal-icon svg {
+            width: 18px;
+            height: 18px;
         }
         
         .modal-title {
             font-family: var(--font-display);
-            font-size: 1.25rem;
+            font-size: 1.125rem;
             font-weight: 600;
             color: var(--color-text);
         }
         
         .modal-desc {
-            font-size: 0.875rem;
+            font-size: 0.8125rem;
             color: var(--color-text-secondary);
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             line-height: 1.5;
         }
         
         .modal-input {
             width: 100%;
-            padding: 14px 16px;
-            background: transparent;
+            padding: 12px 14px;
+            background: var(--color-surface);
             border: 1.5px solid var(--color-border);
             border-radius: var(--radius-md);
             font-family: var(--font-body);
             font-size: 1rem;
             color: var(--color-text);
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             transition: all 0.2s ease;
-            min-height: 50px;
+            min-height: 46px;
         }
         
         .modal-input:focus {
             outline: none;
             border-color: var(--color-blue-dark);
             box-shadow: 0 0 0 3px var(--color-blue-soft);
+            background: var(--color-bg);
         }
         
         .modal-input::placeholder {
@@ -763,12 +778,12 @@
         
         .modal-actions {
             display: flex;
-            gap: 12px;
-            justify-content: flex-end;
+            gap: 10px;
         }
         
         .modal-btn {
-            padding: 10px 20px;
+            flex: 1;
+            padding: 12px 16px;
             border-radius: var(--radius-md);
             font-family: var(--font-body);
             font-size: 0.875rem;
@@ -803,6 +818,48 @@
         .modal-btn-confirm:active {
             transform: translateY(0);
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Desktop modal adjustments */
+        @media (min-width: 768px) {
+            .modal-overlay {
+                padding: 32px;
+            }
+            
+            .modal {
+                padding: 28px;
+                max-width: 360px;
+            }
+            
+            .modal-icon {
+                width: 40px;
+                height: 40px;
+                border-radius: var(--radius-md);
+            }
+            
+            .modal-icon svg {
+                width: 20px;
+                height: 20px;
+            }
+            
+            .modal-title {
+                font-size: 1.25rem;
+            }
+            
+            .modal-desc {
+                font-size: 0.875rem;
+                margin-bottom: 20px;
+            }
+            
+            .modal-input {
+                padding: 14px 16px;
+                min-height: 50px;
+                margin-bottom: 24px;
+            }
+            
+            .modal-actions {
+                gap: 12px;
+            }
         }
         
         /* ========== LOADERS ========== */
