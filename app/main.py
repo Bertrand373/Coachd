@@ -6,6 +6,8 @@ Main FastAPI Application with Twilio Bridge Integration
 import os
 import json
 import shutil
+import asyncio
+import threading
 from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -710,7 +712,7 @@ Bold **key phrases** the agent should say out loud."""
 
 @app.post("/api/chat/stream")
 async def chat_stream(data: ChatRequest):
-    """Stream a chat response"""
+    """Stream a chat response with true async streaming"""
     
     if not settings.anthropic_api_key:
         raise HTTPException(status_code=503, detail="AI service not configured")
@@ -766,25 +768,63 @@ Match your response to what the question actually requires. No filler, no fluff,
 
 Bold **key phrases** the agent should say out loud."""
 
-            with engine.client.messages.stream(
-                model=settings.claude_model,
-                max_tokens=1024,
-                system=system_prompt,
-                messages=messages
-            ) as stream:
-                for text in stream.text_stream:
-                    yield f"data: {json.dumps({'text': text})}\n\n"
-                
-                # Log usage after stream completes
-                final_message = stream.get_final_message()
-                if final_message and final_message.usage:
-                    log_claude_usage(
-                        input_tokens=final_message.usage.input_tokens,
-                        output_tokens=final_message.usage.output_tokens,
-                        agency_code=agency,
+            # Use asyncio.Queue to bridge sync Claude streaming to async generator
+            chunk_queue = asyncio.Queue()
+            usage_info = {'input': 0, 'output': 0}
+            loop = asyncio.get_event_loop()
+            
+            def stream_claude():
+                """Run synchronous Claude streaming in background thread"""
+                try:
+                    with engine.client.messages.stream(
                         model=settings.claude_model,
-                        operation='chat_stream'
+                        max_tokens=1024,
+                        system=system_prompt,
+                        messages=messages
+                    ) as stream:
+                        for text in stream.text_stream:
+                            asyncio.run_coroutine_threadsafe(
+                                chunk_queue.put(('text', text)), loop
+                            )
+                        
+                        final_message = stream.get_final_message()
+                        if final_message and final_message.usage:
+                            usage_info['input'] = final_message.usage.input_tokens
+                            usage_info['output'] = final_message.usage.output_tokens
+                    
+                    asyncio.run_coroutine_threadsafe(
+                        chunk_queue.put(('done', None)), loop
                     )
+                except Exception as e:
+                    asyncio.run_coroutine_threadsafe(
+                        chunk_queue.put(('error', str(e))), loop
+                    )
+            
+            # Start Claude streaming in background thread
+            thread = threading.Thread(target=stream_claude, daemon=True)
+            thread.start()
+            
+            # Yield chunks as they arrive from the queue
+            while True:
+                msg_type, content = await chunk_queue.get()
+                
+                if msg_type == 'text':
+                    yield f"data: {json.dumps({'text': content})}\n\n"
+                elif msg_type == 'done':
+                    break
+                elif msg_type == 'error':
+                    yield f"data: {json.dumps({'error': content})}\n\n"
+                    break
+            
+            # Log usage
+            if usage_info['input'] or usage_info['output']:
+                log_claude_usage(
+                    input_tokens=usage_info['input'],
+                    output_tokens=usage_info['output'],
+                    agency_code=agency,
+                    model=settings.claude_model,
+                    operation='chat_stream'
+                )
             
             yield "data: [DONE]\n\n"
             

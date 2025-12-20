@@ -127,14 +127,13 @@ class RealtimeTranscriber:
             print(f"[RT] Event handlers registered", flush=True)
             
             # Configure live transcription options
-            # MAXIMUM SPEED: Fastest possible sentence detection
+            # Start conservative - get connection working first
             options = LiveOptions(
                 model="nova-2",
                 language="en-US",
                 smart_format=True,
                 interim_results=True,
-                utterance_end_ms="500",   # Was 1000 - faster sentence boundaries
-                endpointing=300,          # Deepgram minimum is 300ms
+                endpointing=300,
                 sample_rate=self.SAMPLE_RATE,
                 encoding="linear16",
                 channels=self.CHANNELS
