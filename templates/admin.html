@@ -347,15 +347,107 @@
         /* ========== DOC LIST ========== */
         .doc-list {
             margin-top: 20px;
-            max-height: 300px;
+            max-height: 340px;
             overflow-y: auto;
         }
         
-        .doc-item {
+        /* System Document - AI Brain */
+        .system-doc {
+            display: grid;
+            grid-template-columns: 40px 1fr auto;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 12px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.06) 0%, rgba(245, 158, 11, 0.02) 100%);
+            border: 1px solid rgba(245, 158, 11, 0.15);
+            border-radius: var(--radius-md);
+        }
+        
+        .system-doc-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(245, 158, 11, 0.1);
+            border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 12px;
+            justify-content: center;
+            color: #D97706;
+            position: relative;
+        }
+        
+        .system-doc-content {
+            min-width: 0;
+        }
+        
+        .system-doc-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--color-text);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .system-doc-title svg {
+            width: 12px;
+            height: 12px;
+            color: var(--color-text-muted);
+        }
+        
+        .system-doc-meta {
+            font-size: 0.75rem;
+            color: var(--color-text-muted);
+            margin-top: 2px;
+        }
+        
+        .training-progress {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .training-ring {
+            width: 32px;
+            height: 32px;
+            position: relative;
+        }
+        
+        .training-ring svg {
+            width: 32px;
+            height: 32px;
+            transform: rotate(-90deg);
+        }
+        
+        .training-ring-bg {
+            fill: none;
+            stroke: var(--color-border);
+            stroke-width: 3;
+        }
+        
+        .training-ring-progress {
+            fill: none;
+            stroke: #D97706;
+            stroke-width: 3;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+        
+        .training-percent {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #D97706;
+            min-width: 32px;
+            text-align: right;
+        }
+        
+        /* User Documents - Grid aligned */
+        .doc-item {
+            display: grid;
+            grid-template-columns: 40px 1fr 32px;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
             border-radius: var(--radius-sm);
             transition: background 0.15s ease;
         }
@@ -364,36 +456,34 @@
             background: var(--color-bg);
         }
         
-        .doc-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
         .doc-icon {
-            width: 36px;
-            height: 36px;
+            width: 40px;
+            height: 40px;
             background: var(--color-blue-soft);
             border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--color-blue-dark);
+            flex-shrink: 0;
+        }
+        
+        .doc-content {
+            min-width: 0;
         }
         
         .doc-name {
             font-weight: 500;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .doc-meta {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--color-text-muted);
-        }
-        
-        .doc-actions {
-            display: flex;
-            gap: 8px;
+            margin-top: 1px;
         }
         
         .btn-icon {
@@ -408,6 +498,7 @@
             justify-content: center;
             color: var(--color-text-muted);
             transition: all 0.15s ease;
+            flex-shrink: 0;
         }
         
         .btn-icon:hover {
@@ -1305,36 +1396,105 @@
         function updateDocList(docs) {
             const container = document.getElementById('docList');
             
+            // System Document - always shows at top
+            const systemDocHTML = `
+                <div class="system-doc" id="systemDoc">
+                    <div class="system-doc-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20">
+                            <path d="M12 2a4 4 0 014 4c0 1.1-.45 2.1-1.17 2.83L12 12l-2.83-3.17A4 4 0 0112 2z"/>
+                            <path d="M12 12v6"/>
+                            <path d="M8 22h8"/>
+                            <path d="M10 22v-4h4v4"/>
+                        </svg>
+                    </div>
+                    <div class="system-doc-content">
+                        <div class="system-doc-title">
+                            AI Brain
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM9 8V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9z"/>
+                            </svg>
+                        </div>
+                        <div class="system-doc-meta">Learns from your winning calls</div>
+                    </div>
+                    <div class="training-progress">
+                        <div class="training-ring">
+                            <svg viewBox="0 0 36 36">
+                                <circle class="training-ring-bg" cx="18" cy="18" r="14"/>
+                                <circle class="training-ring-progress" id="trainingRingProgress" cx="18" cy="18" r="14" 
+                                    stroke-dasharray="88" stroke-dashoffset="88"/>
+                            </svg>
+                        </div>
+                        <span class="training-percent" id="trainingPercent">0%</span>
+                    </div>
+                </div>
+            `;
+            
             if (!docs.length) {
-                container.innerHTML = '<div class="empty-state">No documents uploaded</div>';
+                container.innerHTML = systemDocHTML + '<div class="empty-state">No documents uploaded</div>';
+                loadTrainingProgress();
                 return;
             }
             
-            container.innerHTML = docs.map(doc => `
+            const docsHTML = docs.map(doc => `
                 <div class="doc-item" data-id="${doc.document_id}">
-                    <div class="doc-info">
-                        <div class="doc-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
-                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                                <path d="M14 2v6h6"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <div class="doc-name">${doc.filename}</div>
-                            <div class="doc-meta">${doc.category || 'general'}</div>
-                        </div>
+                    <div class="doc-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                            <path d="M14 2v6h6"/>
+                        </svg>
                     </div>
-                    <div class="doc-actions">
-                        <button class="btn-icon" onclick="deleteDoc('${doc.document_id}')" title="Delete">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16">
-                                <path d="M3 6h18"/>
-                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
-                                <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                            </svg>
-                        </button>
+                    <div class="doc-content">
+                        <div class="doc-name" title="${doc.filename}">${doc.filename}</div>
+                        <div class="doc-meta">${doc.category || 'general'}</div>
                     </div>
+                    <button class="btn-icon" onclick="deleteDoc('${doc.document_id}')" title="Delete">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16">
+                            <path d="M3 6h18"/>
+                            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
+                            <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
                 </div>
             `).join('');
+            
+            container.innerHTML = systemDocHTML + docsHTML;
+            loadTrainingProgress();
+        }
+        
+        // Load training progress for AI Brain
+        async function loadTrainingProgress() {
+            try {
+                const pwd = await getAdminPassword();
+                const res = await fetch('/api/admin/winning-rebuttals/status', {
+                    headers: { 'X-Admin-Password': pwd }
+                });
+                
+                if (!res.ok) return;
+                
+                const data = await res.json();
+                const status = data.data || {};
+                
+                // Calculate training percentage
+                // Factors: outcomes collected, rebuttals meeting threshold, objection coverage
+                const outcomes = status.total_outcomes || 0;
+                const targetOutcomes = 100; // Fully trained at 100 outcomes
+                const outcomeScore = Math.min(outcomes / targetOutcomes, 1) * 100;
+                
+                const percent = Math.round(outcomeScore);
+                
+                // Update ring
+                const ring = document.getElementById('trainingRingProgress');
+                const percentEl = document.getElementById('trainingPercent');
+                
+                if (ring && percentEl) {
+                    const circumference = 88; // 2 * PI * 14
+                    const offset = circumference - (percent / 100) * circumference;
+                    ring.style.strokeDashoffset = offset;
+                    percentEl.textContent = percent + '%';
+                }
+            } catch (e) {
+                console.log('Training progress not available');
+            }
         }
         
         // ==================== DOCUMENT FUNCTIONS ====================

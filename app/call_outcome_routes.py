@@ -24,8 +24,10 @@ from .call_outcomes import (
 from .winning_rebuttals import (
     get_generator,
     reindex_winning_rebuttals,
+    reindex_all_agencies,
     weekly_refresh
 )
+from .call_outcomes import get_agency_config
 
 # ==================== CONFIG ====================
 
@@ -309,19 +311,34 @@ async def get_winning_rebuttals_document(
 
 @router.post("/api/admin/winning-rebuttals/reindex")
 async def reindex_winning_rebuttals_endpoint(
+    agency: Optional[str] = None,
+    all_agencies: bool = False,
     _: bool = Depends(verify_admin)
 ):
     """
     Re-index the winning rebuttals document into ChromaDB.
-    Call this after generating or to force a refresh.
+    
+    CRITICAL: This indexes into agency-specific collections so RAG actually finds the rebuttals.
+    
+    Args:
+        agency: Specific agency to index for (e.g., "ADERHOLT")
+        all_agencies: If True, index into ALL agency collections
     
     Requires: X-Admin-Password header
     """
-    # Import here to avoid circular imports
     try:
-        from chromadb_utils import get_chroma_client
-        client = get_chroma_client()
-        result = reindex_winning_rebuttals(client)
+        from .vector_db import get_vector_db
+        db = get_vector_db()
+        
+        if all_agencies:
+            # Get all agencies and index to each
+            config = get_agency_config()
+            agencies = [a['code'] for a in config.get_agencies()]
+            result = reindex_all_agencies(db.client, agencies)
+        else:
+            # Index to specific agency or shared
+            result = reindex_winning_rebuttals(db.client, agency=agency)
+        
         return JSONResponse(content={
             "status": "success" if result.get('success') else "error",
             "data": result
@@ -329,7 +346,7 @@ async def reindex_winning_rebuttals_endpoint(
     except ImportError:
         return JSONResponse(content={
             "status": "error",
-            "message": "ChromaDB not configured. Implement get_chroma_client() in chromadb_utils.py"
+            "message": "ChromaDB not configured"
         }, status_code=500)
     except Exception as e:
         return JSONResponse(content={
@@ -340,18 +357,30 @@ async def reindex_winning_rebuttals_endpoint(
 
 @router.post("/api/admin/winning-rebuttals/refresh")
 async def full_refresh(
+    agency: Optional[str] = None,
     _: bool = Depends(verify_admin)
 ):
     """
-    Full refresh: generate document and re-index.
+    Full refresh: generate document and re-index to agency collections.
     This is what the weekly scheduled task calls.
+    
+    By default, indexes to ALL agencies. Pass agency param to target one.
     
     Requires: X-Admin-Password header
     """
     try:
         from .vector_db import get_vector_db
         db = get_vector_db()
-        result = weekly_refresh(db.client)
+        
+        # Get agencies list
+        if agency:
+            agencies = [agency]
+        else:
+            # Default: refresh for all agencies
+            config = get_agency_config()
+            agencies = [a['code'] for a in config.get_agencies()]
+        
+        result = weekly_refresh(db.client, agencies)
         return JSONResponse(content={
             "status": "success" if result.get('success') else "error",
             "data": result

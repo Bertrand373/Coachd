@@ -17,6 +17,7 @@ import os
 import json
 from datetime import datetime
 from typing import Optional
+from typing import Optional, List
 from .call_outcomes import get_outcome_storage, WinningGuidance
 
 # ==================== CONFIG ====================
@@ -230,9 +231,24 @@ class WinningRebuttalsGenerator:
 
 # ==================== CHROMADB INTEGRATION ====================
 
-def reindex_winning_rebuttals(chroma_client, collection_name: str = "documents") -> dict:
+def _get_agency_collection_name(agency: Optional[str] = None) -> str:
     """
-    Re-index the winning rebuttals document into ChromaDB.
+    Get collection name matching vector_db.py pattern.
+    This ensures winning rebuttals go into the SAME collection
+    that RAG searches during guidance generation.
+    """
+    if agency:
+        safe_name = agency.lower().replace(" ", "_").replace("-", "_")
+        return f"agency_{safe_name}"
+    return "coachd_shared"
+
+
+def reindex_winning_rebuttals(chroma_client, agency: Optional[str] = None) -> dict:
+    """
+    Re-index the winning rebuttals document into an agency's ChromaDB collection.
+    
+    CRITICAL: This indexes into the SAME collection that RAG searches,
+    so the AI will actually find and use these winning rebuttals.
     
     This should be called:
     1. After generating/updating the document
@@ -241,7 +257,7 @@ def reindex_winning_rebuttals(chroma_client, collection_name: str = "documents")
     
     Args:
         chroma_client: ChromaDB client instance
-        collection_name: Name of the collection to index into
+        agency: Agency code (e.g., "ADERHOLT") - indexes into agency_{code} collection
     
     Returns:
         Status dict
@@ -261,6 +277,8 @@ def reindex_winning_rebuttals(chroma_client, collection_name: str = "documents")
         if not content:
             return {"success": False, "message": "Could not read document"}
         
+        # Use the same collection naming as vector_db.py
+        collection_name = _get_agency_collection_name(agency)
         collection = chroma_client.get_or_create_collection(name=collection_name)
         
         # Use a fixed ID so we update rather than duplicate
@@ -278,7 +296,9 @@ def reindex_winning_rebuttals(chroma_client, collection_name: str = "documents")
             ids=[doc_id],
             metadatas=[{
                 "source": "SYSTEM_WINNING_REBUTTALS",
+                "filename": "AI Brain - Winning Rebuttals",
                 "type": "system_document",
+                "category": "system",
                 "generated": True,
                 "version": meta.get('version', 1) if meta else 1,
                 "last_updated": meta.get('last_updated', '') if meta else '',
@@ -286,12 +306,13 @@ def reindex_winning_rebuttals(chroma_client, collection_name: str = "documents")
             }]
         )
         
-        print(f"[WINNING] Indexed into ChromaDB collection '{collection_name}'")
+        print(f"[WINNING] Indexed into ChromaDB collection '{collection_name}' for agency '{agency or 'shared'}'")
         
         return {
             "success": True,
-            "message": "Document indexed successfully",
+            "message": f"Document indexed into {collection_name}",
             "collection": collection_name,
+            "agency": agency,
             "version": meta.get('version', 1) if meta else 1
         }
         
@@ -303,12 +324,51 @@ def reindex_winning_rebuttals(chroma_client, collection_name: str = "documents")
         }
 
 
+def reindex_all_agencies(chroma_client, agencies: list[str]) -> dict:
+    """
+    Re-index winning rebuttals into ALL agency collections.
+    
+    Args:
+        chroma_client: ChromaDB client instance
+        agencies: List of agency codes (e.g., ["ADERHOLT", "BROOKS"])
+    
+    Returns:
+        Status dict with results per agency
+    """
+    generator = WinningRebuttalsGenerator()
+    
+    if not generator.document_exists():
+        return {
+            "success": False,
+            "message": "Winning rebuttals document does not exist yet"
+        }
+    
+    results = {}
+    success_count = 0
+    
+    for agency in agencies:
+        result = reindex_winning_rebuttals(chroma_client, agency)
+        results[agency] = result
+        if result.get('success'):
+            success_count += 1
+    
+    return {
+        "success": success_count == len(agencies),
+        "message": f"Indexed into {success_count}/{len(agencies)} agency collections",
+        "agencies": results
+    }
+
+
 # ==================== SCHEDULED TASK ====================
 
-def weekly_refresh(chroma_client) -> dict:
+def weekly_refresh(chroma_client, agencies: list[str] = None) -> dict:
     """
-    Run the full refresh: generate document and re-index.
+    Run the full refresh: generate document and re-index to all agencies.
     Call this from a scheduled task (e.g., every Sunday night).
+    
+    Args:
+        chroma_client: ChromaDB client instance
+        agencies: List of agency codes. If None, indexes to shared collection only.
     """
     generator = WinningRebuttalsGenerator()
     
@@ -318,8 +378,12 @@ def weekly_refresh(chroma_client) -> dict:
     if not gen_result.get('success') and not gen_result.get('generated'):
         return gen_result
     
-    # Re-index into ChromaDB
-    index_result = reindex_winning_rebuttals(chroma_client)
+    # Re-index into ChromaDB for all agencies
+    if agencies:
+        index_result = reindex_all_agencies(chroma_client, agencies)
+    else:
+        # Fallback to shared collection
+        index_result = reindex_winning_rebuttals(chroma_client, agency=None)
     
     return {
         "success": index_result.get('success', False),
