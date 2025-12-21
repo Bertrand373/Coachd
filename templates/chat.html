@@ -211,9 +211,9 @@
         /* ========== MESSAGES ========== */
         .message {
             display: flex;
-            gap: 12px;
-            max-width: 85%;
-            margin-bottom: 16px;
+            flex-direction: column;
+            max-width: 100%;
+            margin-bottom: 20px;
             animation: fadeIn 0.2s ease;
         }
         
@@ -222,34 +222,49 @@
             to { opacity: 1; transform: translateY(0); }
         }
         
-        .message.user { align-self: flex-end; flex-direction: row-reverse; }
+        /* User messages - subtle gray pill, right aligned */
+        .message.user {
+            align-items: flex-end;
+        }
         
-        .message-avatar {
-            flex-shrink: 0;
-            width: 32px;
-            height: 32px;
-            border-radius: var(--radius-sm);
+        .message.user .message-content {
             background: var(--color-surface);
+            color: var(--color-text-secondary);
+            padding: 10px 16px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            max-width: 85%;
+        }
+        
+        /* AI messages - clean text, no container */
+        .message.ai {
+            align-items: flex-start;
+        }
+        
+        .message.ai .ai-indicator {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-family: var(--font-display);
+            gap: 5px;
+            margin-bottom: 6px;
             font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--color-text-secondary);
+            color: var(--color-text-muted);
+            font-weight: 500;
         }
         
-        .message.ai .message-avatar { background: var(--color-accent-soft); color: var(--color-accent); }
-        
-        .message-content {
-            padding: 14px 18px;
-            border-radius: var(--radius-lg);
-            font-size: 0.9375rem;
-            line-height: 1.6;
+        .message.ai .ai-indicator svg {
+            width: 12px;
+            height: 12px;
+            color: var(--color-accent);
         }
         
-        .message.user .message-content { background: var(--color-text); color: white; border-bottom-right-radius: 4px; }
-        .message.ai .message-content { background: var(--color-surface); border-bottom-left-radius: 4px; }
+        .message.ai .message-content {
+            font-size: 1rem;
+            line-height: 1.65;
+            color: var(--color-text);
+            /* No background, no padding - clean text */
+        }
+        
         .message-content strong { font-weight: 600; }
         .message-content p { margin-bottom: 12px; }
         .message-content p:last-child { margin-bottom: 0; }
@@ -267,7 +282,7 @@
         .thinking-dots span {
             width: 6px;
             height: 6px;
-            background: var(--color-text-muted);
+            background: var(--color-accent);
             border-radius: 50%;
             animation: dotPulse 1.4s ease-in-out infinite;
         }
@@ -1209,6 +1224,8 @@
         }
         
         // ============ MESSAGE RENDERING ============
+        const SPARKLE_ICON = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L14.5 9.5L23 12L14.5 14.5L12 23L9.5 14.5L1 12L9.5 9.5L12 1Z"/></svg>`;
+        
         function addMessage(role, content) {
             if (emptyState && emptyState.parentNode) {
                 emptyState.remove();
@@ -1218,13 +1235,19 @@
             const displayRole = role === 'assistant' ? 'ai' : role;
             const apiRole = role === 'ai' ? 'assistant' : role;
             
-            const avatar = displayRole === 'ai' ? 'CR' : 'You';
             const messageEl = document.createElement('div');
             messageEl.className = `message ${displayRole}`;
-            messageEl.innerHTML = `
-                <div class="message-avatar">${avatar}</div>
-                <div class="message-content">${formatMessage(content)}</div>
-            `;
+            
+            if (displayRole === 'ai') {
+                messageEl.innerHTML = `
+                    <div class="ai-indicator">${SPARKLE_ICON} Coachd</div>
+                    <div class="message-content">${formatMessage(content)}</div>
+                `;
+            } else {
+                messageEl.innerHTML = `
+                    <div class="message-content">${formatMessage(content)}</div>
+                `;
+            }
             
             chatContainer.appendChild(messageEl);
             chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -1256,11 +1279,11 @@
             
             addMessage('user', text);
             
-            // Create AI message bubble with thinking dots
+            // Create AI message with sparkle indicator and thinking dots
             const messageEl = document.createElement('div');
             messageEl.className = 'message ai';
             messageEl.innerHTML = `
-                <div class="message-avatar">CR</div>
+                <div class="ai-indicator">${SPARKLE_ICON} Coachd</div>
                 <div class="message-content streaming"><div class="thinking-dots"><span></span><span></span><span></span></div></div>
             `;
             chatContainer.appendChild(messageEl);
