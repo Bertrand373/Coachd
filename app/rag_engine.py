@@ -391,16 +391,16 @@ YOUR GUIDANCE SHOULD:
 3. Address the CURRENT objection with Globe Life's proven rebuttals
 4. Include EXACT WORDS the agent can use
 5. Suggest down-close when price objection occurs
-6. Be CONCISE (2-3 sentences max)
+6. Be as long as genuinely needed for the situation
 
 RESPONSE FORMAT:
 "[Exact words to say in quotes]"
 
-Why: [1 sentence]
+Why: [Brief explanation if helpful]
 Next: [If relevant - down-close or phase transition]
 
 DO NOT:
-- Give long explanations
+- Give long explanations when short ones suffice
 - List multiple options  
 - Ignore the call state above
 - Repeat guidance already given
@@ -459,7 +459,7 @@ Provide guidance for the agent."""
         # Stream the response
         with self.client.messages.stream(
             model=settings.claude_model,
-            max_tokens=400,  # Keep responses concise
+            max_tokens=400,  # Allow guidance to be as long as genuinely needed
             system=system_prompt,
             messages=messages
         ) as stream:

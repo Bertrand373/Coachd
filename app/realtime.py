@@ -1,5 +1,5 @@
 """
-Coachd Real-Time Engine
+Coachd Real-Time Engine - UPDATED
 Deepgram streaming + live AI guidance
 
 Production-ready with:
@@ -8,6 +8,7 @@ Production-ready with:
 - Proper error handling
 - OPTIMIZED: Reduced latency for real-time feel
 - BILLING: Complete usage tracking for Deepgram and Claude
+- FIX: Duplicate trigger prevention
 """
 
 import asyncio
@@ -39,7 +40,7 @@ class RealtimeTranscriber:
     #
     GUIDANCE_TIMEOUT_SECONDS = 8.0   # Max time for AI guidance generation
     GUIDANCE_COOLDOWN_SECONDS = 3.0  # Cooldown for word-count triggers
-    # Note: Hot triggers use 1.0s cooldown (hardcoded in _check_for_guidance_trigger)
+    HOT_TRIGGER_COOLDOWN_SECONDS = 1.5  # Just enough to catch interim/final race; semantic check handles the rest
     MIN_WORDS_FOR_GUIDANCE = 12      # Minimum words before non-trigger guidance
     
     # Audio format constants for duration calculation
@@ -53,6 +54,7 @@ class RealtimeTranscriber:
         self.connection = None
         self.transcript_buffer = ""
         self.last_guidance_time = 0
+        self.last_trigger_text = ""  # Track last trigger to prevent semantic duplicates
         self.call_context = CallContext()  # Legacy fallback
         self.state_machine = None  # V2: Full state tracking
         self.rag_engine = None
@@ -67,7 +69,7 @@ class RealtimeTranscriber:
         self._total_audio_bytes = 0  # Track total audio bytes received
         self._audio_duration_seconds = 0.0  # Calculated audio duration
         
-        print(f"[RT] RealtimeTranscriber initialized (session={self._session_id[:8]}, cooldown={self.GUIDANCE_COOLDOWN_SECONDS}s, min_words={self.MIN_WORDS_FOR_GUIDANCE})", flush=True)
+        print(f"[RT] RealtimeTranscriber initialized (session={self._session_id[:8]}, cooldown={self.GUIDANCE_COOLDOWN_SECONDS}s, hot_cooldown={self.HOT_TRIGGER_COOLDOWN_SECONDS}s, min_words={self.MIN_WORDS_FOR_GUIDANCE})", flush=True)
         
         # Initialize Deepgram client
         if settings.deepgram_api_key:
@@ -107,94 +109,59 @@ class RealtimeTranscriber:
         self._total_audio_bytes = 0
         self._audio_duration_seconds = 0.0
             
-        # Initialize RAG engine (non-critical - can run without it)
+        # Initialize RAG engine
         try:
             self.rag_engine = get_rag_engine()
             print(f"[RT] RAG engine initialized", flush=True)
         except Exception as e:
-            print(f"[RT] WARNING: RAG engine not available: {e}", flush=True)
+            print(f"[RT] WARNING: RAG engine init failed: {e}", flush=True)
             self.rag_engine = None
         
         try:
-            print(f"[RT] Creating Deepgram live connection...", flush=True)
-            
             # Create live transcription connection
             self.connection = self.deepgram.listen.live.v("1")
-            print(f"[RT] Connection object created: {type(self.connection)}", flush=True)
             
-            # Set up event handlers
+            # Register event handlers
             self.connection.on(LiveTranscriptionEvents.Transcript, self._handle_transcript)
             self.connection.on(LiveTranscriptionEvents.Error, self._handle_error)
             self.connection.on(LiveTranscriptionEvents.Close, self._handle_close)
-            print(f"[RT] Event handlers registered", flush=True)
             
-            # Configure live transcription options
-            # Start conservative - get connection working first
+            # Configure options for low latency
             options = LiveOptions(
                 model="nova-2",
                 language="en-US",
                 smart_format=True,
-                interim_results=True,
-                endpointing=300,
-                sample_rate=self.SAMPLE_RATE,
+                interim_results=True,  # Get results as speech happens
+                utterance_end_ms=1000,  # Reduced from default
+                vad_events=True,
                 encoding="linear16",
-                channels=self.CHANNELS
+                sample_rate=16000,
+                channels=1
             )
-            print(f"[RT] Options configured, starting connection...", flush=True)
             
-            # Start the connection in an executor to prevent blocking
-            try:
-                result = await asyncio.wait_for(
-                    asyncio.get_event_loop().run_in_executor(
-                        None, 
-                        lambda: self.connection.start(options)
-                    ),
-                    timeout=8.0
-                )
-                print(f"[RT] connection.start() returned: {result}", flush=True)
-            except asyncio.TimeoutError:
-                print(f"[RT] ERROR: connection.start() timed out after 8 seconds", flush=True)
-                await self.on_transcript({
-                    "type": "error",
-                    "message": "Deepgram connection timed out"
-                })
-                return False
+            # Start the connection (this is synchronous in Deepgram SDK)
+            result = self.connection.start(options)
+            print(f"[RT] connection.start() returned: {result}", flush=True)
             
-            # Give it a moment to fully establish
-            await asyncio.sleep(0.3)
+            self.is_running = True
+            print(f"[RT] SUCCESS: Deepgram connection started", flush=True)
+            return True
             
-            if self.connection:
-                self.is_running = True
-                print(f"[RT] SUCCESS: Deepgram connection started", flush=True)
-                return True
-            else:
-                print(f"[RT] ERROR: Connection is None after start", flush=True)
-                await self.on_transcript({
-                    "type": "error",
-                    "message": "Failed to connect to transcription service"
-                })
-                return False
-                
         except Exception as e:
-            print(f"[RT] ERROR: Deepgram connection error: {e}", flush=True)
+            print(f"[RT] ERROR starting Deepgram: {e}", flush=True)
             import traceback
             traceback.print_exc()
-            await self.on_transcript({
-                "type": "error",
-                "message": f"Transcription service error: {str(e)}"
-            })
             return False
-        
+            
     async def send_audio(self, audio_data: bytes):
-        """Send audio chunk to Deepgram (non-blocking)"""
+        """Send audio data to Deepgram"""
         if not self.connection or not self.is_running:
             return
         
-        # Track audio bytes for usage calculation
+        # Track bytes for usage calculation
         self._total_audio_bytes += len(audio_data)
             
         try:
-            # Run in executor to prevent blocking the event loop
             loop = asyncio.get_event_loop()
             await asyncio.wait_for(
                 loop.run_in_executor(None, self.connection.send, audio_data),
@@ -301,6 +268,40 @@ class RealtimeTranscriber:
         except Exception as e:
             print(f"[RT] Error handling transcript: {e}", flush=True)
     
+    def _is_semantic_duplicate(self, new_text: str) -> bool:
+        """Check if new trigger text is semantically similar to the last trigger"""
+        if not self.last_trigger_text:
+            return False
+        
+        # Reset tracking if it's been more than 3 seconds since last trigger
+        # This allows the same objection to re-trigger if client repeats it
+        # (meaning agent's response didn't land and they need a different approach)
+        time_since_last = time.time() - self.last_guidance_time
+        if time_since_last > 3.0:
+            if self.last_trigger_text:  # Only log if there was something to reset
+                print(f"[RT] Resetting duplicate tracking (>{time_since_last:.1f}s since last trigger)", flush=True)
+            self.last_trigger_text = ""  # Reset - allow new triggers
+            return False
+        
+        # Simple heuristic: if the new text starts the same way or is a substring
+        new_lower = new_text.lower().strip()
+        last_lower = self.last_trigger_text.lower().strip()
+        
+        # Check if one is a prefix/extension of the other
+        if new_lower.startswith(last_lower[:30]) or last_lower.startswith(new_lower[:30]):
+            return True
+        
+        # Check word overlap (if >70% words match, it's likely the same utterance)
+        new_words = set(new_lower.split())
+        last_words = set(last_lower.split())
+        
+        if len(new_words) > 0 and len(last_words) > 0:
+            overlap = len(new_words & last_words) / max(len(new_words), len(last_words))
+            if overlap > 0.7:
+                return True
+        
+        return False
+    
     def _check_for_guidance_trigger(self, latest_transcript: str, is_final: bool = True):
         """Check if we should trigger guidance generation"""
         # Don't generate if already generating
@@ -347,16 +348,29 @@ class RealtimeTranscriber:
         
         has_hot_trigger = any(kw in text_lower for kw in hot_triggers)
         
-        # HOT TRIGGERS: 1 second cooldown (react fast to objections)
-        # WORD COUNT: 3 second cooldown (normal flow)
+        # HOT TRIGGERS: Use increased cooldown to prevent duplicates
         if has_hot_trigger:
-            # Reduced cooldown for hot triggers - react fast!
-            if now - self.last_guidance_time < 1.0:
+            # Check cooldown FIRST
+            if now - self.last_guidance_time < self.HOT_TRIGGER_COOLDOWN_SECONDS:
                 return
+            
+            # Check for semantic duplicates (interim vs final of same utterance)
+            if self._is_semantic_duplicate(latest_transcript):
+                print(f"[RT] Skipping duplicate trigger: '{latest_transcript[:40]}...'", flush=True)
+                return
+            
+            # ======= CRITICAL FIX: Set timestamp IMMEDIATELY before async call =======
+            # This prevents the race condition where a second trigger slips through
+            # before _generate_guidance has a chance to set the timestamp
+            self.last_guidance_time = now
+            self.last_trigger_text = latest_transcript
+            
             print(f"[RT] 🔥 HOT TRIGGER detected: '{latest_transcript[:50]}...' - generating immediately", flush=True)
-            # CRITICAL: Add this transcript to buffer so guidance has content to work with
+            
+            # Add this transcript to buffer so guidance has content to work with
             if latest_transcript.strip():
                 self.transcript_buffer = latest_transcript  # Use triggering text directly
+            
             self._schedule_async(self._generate_guidance())
             return
         
@@ -372,6 +386,7 @@ class RealtimeTranscriber:
         
         # Generate guidance if enough words accumulated
         if word_count > self.MIN_WORDS_FOR_GUIDANCE:
+            self.last_guidance_time = now  # Also set here to prevent duplicates
             self._schedule_async(self._generate_guidance())
                    
     def _handle_error(self, *args, **kwargs):
@@ -408,7 +423,7 @@ class RealtimeTranscriber:
             return
             
         self._generating_guidance = True
-        self.last_guidance_time = time.time()
+        # Note: last_guidance_time is now set in _check_for_guidance_trigger to prevent race condition
         
         print(f"[RT] Starting guidance generation for: '{self.transcript_buffer[:60]}...'", flush=True)
         
@@ -559,121 +574,33 @@ class RealtimeTranscriber:
         if "agency" in context_data:
             self._agency = context_data["agency"]
             print(f"[RT] Agency set to: {self._agency} for session {self._session_id[:8]}", flush=True)
-        
-        # Create or update state machine (V2)
-        if self.state_machine is None:
+            
+        # V2: Create state machine for proper tracking if call type is set
+        if context_data.get("call_type") and not self.state_machine:
+            call_type = context_data.get("call_type", "presentation")
+            is_phone = call_type in ["phone", "phone_call", "appointment"]
+            
             self.state_machine = CallStateMachine(
                 session_id=self._session_id,
-                agency=self._agency or "default",
-                call_type=context_data.get("call_type", "phone")
+                is_phone_call=is_phone
             )
             print(f"[RT] State machine created for session {self._session_id[:8]}", flush=True)
-        
-        # Update state machine with client info
-        if self.state_machine:
-            self.state_machine.update_client_profile(
-                age=context_data.get("client_age"),
-                occupation=context_data.get("client_occupation"),
-                family=context_data.get("client_family"),
-                budget=context_data.get("client_budget")
-            )
-    
-    def apply_down_close(self):
-        """Agent clicked down-close button - reduce coverage and generate contextual guidance"""
-        if self.state_machine:
-            result = self.state_machine.do_down_close(reason="price")
-            level = result.get('level', 0)
-            label = result.get('label', '')
-            print(f"[RT] Down-close applied: level {level}, {label}", flush=True)
             
-            # Generate contextual guidance for this down-close
-            self._schedule_async(self._generate_down_close_guidance(level, label))
-        else:
-            print(f"[RT] Down-close requested but no state machine", flush=True)
-    
-    async def _generate_down_close_guidance(self, level: int, label: str):
-        """Generate contextual down-close guidance using Claude"""
-        try:
-            if not self.rag_engine:
-                self.rag_engine = get_rag_engine()
-            
-            full_text = ""
-            first_chunk = True
-            batch_buffer = ""
-            last_send_time = time.time()
-            BATCH_INTERVAL = 0.08
-            
-            # Get full state for context
-            call_state = self.state_machine.get_state_for_claude()
-            
-            # Build specific down-close prompt
-            down_close_prompt = f"""The client just said they can't afford the coverage. The agent clicked to reduce coverage.
-
-DOWN-CLOSE LEVEL: {level} - {label}
-CURRENT COVERAGE: {call_state.get('coverage_summary', 'Unknown')}
-
-Based on the conversation so far, give the agent EXACTLY what to say to present this reduced coverage option.
-- Reference something specific from the conversation (family, job, concerns mentioned)
-- State the new coverage amount naturally
-- Keep it to 2-3 sentences max
-- Make it feel personal, not scripted"""
-
-            print(f"[RT] Generating contextual down-close guidance...", flush=True)
-            
-            for chunk in self.rag_engine.generate_guidance_stream_v2(
-                call_state,
-                down_close_prompt,
-                agency=self._agency,
-                session_id=self._session_id
-            ):
-                if chunk:
-                    full_text += chunk
-                    batch_buffer += chunk
-                    
-                    now = time.time()
-                    if first_chunk or (now - last_send_time) >= BATCH_INTERVAL:
-                        await self.on_guidance({
-                            "type": "guidance_start" if first_chunk else "guidance_chunk",
-                            "chunk": batch_buffer,
-                            "full_text": full_text,
-                            "is_complete": False
-                        })
-                        batch_buffer = ""
-                        last_send_time = now
-                        first_chunk = False
-            
-            if batch_buffer:
-                await self.on_guidance({
-                    "type": "guidance_chunk",
-                    "chunk": batch_buffer,
-                    "full_text": full_text,
-                    "is_complete": False
-                })
-            
-            if full_text:
-                print(f"[RT] Down-close guidance complete ({len(full_text)} chars)", flush=True)
-                self.state_machine.record_guidance(full_text, f"down_close_level_{level}")
-                await self.on_guidance({
-                    "type": "guidance_complete",
-                    "guidance": full_text,
-                    "trigger": f"down_close_level_{level}"
-                })
+            # Feed client info to state machine
+            if context_data.get("client_age"):
+                self.state_machine.update_client_profile(age=context_data["client_age"])
+            if context_data.get("client_occupation"):
+                self.state_machine.update_client_profile(occupation=context_data["client_occupation"])
+            if context_data.get("client_family"):
+                self.state_machine.update_client_profile(family=context_data["client_family"])
+            if context_data.get("budget"):
+                self.state_machine.update_client_profile(budget=context_data["budget"])
                 
-        except Exception as e:
-            print(f"[RT] Error generating down-close guidance: {e}", flush=True)
-            import traceback
-            traceback.print_exc()
-    
-    def get_session_stats(self) -> dict:
-        """Get current session statistics for debugging/monitoring"""
-        bytes_per_second = self.SAMPLE_RATE * self.BYTES_PER_SAMPLE * self.CHANNELS
-        current_duration = self._total_audio_bytes / bytes_per_second if self._total_audio_bytes > 0 else 0
-        
-        return {
-            "session_id": self._session_id,
-            "agency": self._agency,
-            "audio_bytes": self._total_audio_bytes,
-            "audio_duration_seconds": current_duration,
-            "is_running": self.is_running,
-            "transcript_buffer_words": len(self.transcript_buffer.split())
-        }
+    def apply_down_close(self):
+        """Apply a down-close level when agent clicks the button"""
+        if self.state_machine:
+            success = self.state_machine.apply_down_close()
+            level = self.state_machine.down_close_level
+            print(f"[RT] Down-close applied: level={level}, success={success}", flush=True)
+            return success
+        return False
