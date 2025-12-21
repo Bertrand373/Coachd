@@ -133,7 +133,6 @@ class RealtimeTranscriber:
                 smart_format=True,
                 interim_results=True,  # Get results as speech happens
                 utterance_end_ms=1000,  # Reduced from default
-                vad_events=True,
                 encoding="linear16",
                 sample_rate=16000,
                 channels=1
@@ -184,14 +183,22 @@ class RealtimeTranscriber:
         
         if self.connection:
             try:
+                # Try finish() first, fall back to close() for older SDK versions
                 loop = asyncio.get_event_loop()
-                await asyncio.wait_for(
-                    loop.run_in_executor(None, self.connection.finish),
-                    timeout=3.0
-                )
-                print(f"[RT] connection.finish() completed", flush=True)
+                if hasattr(self.connection, 'finish'):
+                    await asyncio.wait_for(
+                        loop.run_in_executor(None, self.connection.finish),
+                        timeout=3.0
+                    )
+                    print(f"[RT] connection.finish() completed", flush=True)
+                elif hasattr(self.connection, 'close'):
+                    await asyncio.wait_for(
+                        loop.run_in_executor(None, self.connection.close),
+                        timeout=3.0
+                    )
+                    print(f"[RT] connection.close() completed", flush=True)
             except asyncio.TimeoutError:
-                print(f"[RT] WARNING: connection.finish() timed out", flush=True)
+                print(f"[RT] WARNING: connection cleanup timed out", flush=True)
             except Exception as e:
                 print(f"[RT] Error finishing connection: {e}", flush=True)
             finally:
