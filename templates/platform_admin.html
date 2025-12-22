@@ -298,7 +298,7 @@
         }
         
         .service-icon.deepgram { background: #13EF93; color: #000; }
-        .service-icon.twilio { background: #F22F46; color: white; }
+        .service-icon.telnyx { background: #00C26F; color: white; }
         .service-icon.claude { background: #D4A574; color: white; }
         .service-icon.render { background: #46E3B7; color: #000; }
         
@@ -571,7 +571,7 @@
         }
         
         .activity-dot.deepgram { background: #13EF93; }
-        .activity-dot.twilio { background: #F22F46; }
+        .activity-dot.telnyx { background: #00C26F; }
         .activity-dot.claude { background: #D4A574; }
         
         .activity-content { flex: 1; }
@@ -929,7 +929,7 @@
                     </svg>
                 </div>
                 <div class="stat-value" id="totalRequests">0</div>
-                <div class="stat-label">API Requests (30d)<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Total API calls made to all external services (Deepgram, Twilio, Claude) in the last 30 days</span></span></div>
+                <div class="stat-label">API Requests (30d)<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Total API calls made to all external services (Deepgram, Telnyx, Claude) in the last 30 days</span></span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon purple">
@@ -950,7 +950,7 @@
                     </svg>
                 </div>
                 <div class="stat-value" id="serviceStatus">4/4</div>
-                <div class="stat-label">Services Online<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">External services Coachd depends on: Deepgram (transcription), Twilio (calls), Claude (AI), and Render (hosting)</span></span></div>
+                <div class="stat-label">Services Online<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">External services Coachd depends on: Deepgram (transcription), Telnyx (calls), Claude (AI), and Render (hosting)</span></span></div>
             </div>
         </div>
         
@@ -985,27 +985,27 @@
                     </div>
                 </div>
                 
-                <!-- Twilio -->
+                <!-- Telnyx -->
                 <div class="service-card">
                     <div class="service-header">
-                        <div class="service-icon twilio">TW</div>
+                        <div class="service-icon telnyx">TX</div>
                         <div>
-                            <div class="service-name">Twilio</div>
-                            <div class="service-status">Voice & SMS</div>
+                            <div class="service-name">Telnyx</div>
+                            <div class="service-status">Voice & Telephony</div>
                         </div>
                     </div>
                     <div class="service-metrics">
                         <div class="metric-row">
-                            <span class="metric-label">Call Minutes<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Total voice call duration. Twilio connects agents to the monitoring system via phone call.</span></span></span>
-                            <span class="metric-value" id="twMinutes">0</span>
+                            <span class="metric-label">Call Minutes<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Total voice call duration. Telnyx connects agents to the monitoring system via phone call.</span></span></span>
+                            <span class="metric-value" id="txMinutes">0</span>
                         </div>
                         <div class="metric-row">
-                            <span class="metric-label">Total Calls<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Number of monitored call sessions initiated through the "Call Me to Start" feature.</span></span></span>
-                            <span class="metric-value" id="twCalls">0</span>
+                            <span class="metric-label">Total Calls<span class="info-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="tip-text">Number of monitored call sessions initiated through the Telnyx telephony integration.</span></span></span>
+                            <span class="metric-value" id="txCalls">0</span>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">Actual Cost</span>
-                            <span class="metric-value cost" id="twCost">$0.00</span>
+                            <span class="metric-value cost" id="txCost">$0.00</span>
                         </div>
                     </div>
                 </div>
@@ -1127,7 +1127,7 @@
                                 <tr>
                                     <th>Agency</th>
                                     <th>Deepgram</th>
-                                    <th>Twilio</th>
+                                    <th>Telnyx</th>
                                     <th>Claude</th>
                                     <th>Total Cost</th>
                                     <th>% of Total</th>
@@ -1449,7 +1449,7 @@
             // Service status
             let servicesOk = 0;
             if (!external.deepgram?.error) servicesOk++;
-            if (!external.twilio?.error) servicesOk++;
+            if (!external.telnyx?.error) servicesOk++;
             if (!external.anthropic?.error) servicesOk++;
             if (!external.render?.error) servicesOk++;
             document.getElementById('serviceStatus').textContent = servicesOk + '/4';
@@ -1460,12 +1460,12 @@
             document.getElementById('dgRequests').textContent = formatNumber(dg.request_count || 0);
             document.getElementById('dgCost').textContent = formatCurrency(dg.total_cost);
             
-            // Twilio metrics - prefer external actual cost
-            const tw = byService.twilio || {};
-            const twActual = external.twilio?.summary?.total_cost;
-            document.getElementById('twMinutes').textContent = formatNumber(Math.round(tw.total_quantity || 0));
-            document.getElementById('twCalls').textContent = formatNumber(tw.request_count || 0);
-            document.getElementById('twCost').textContent = formatCurrency(twActual !== undefined ? twActual : tw.total_cost);
+            // Telnyx metrics - prefer external actual cost
+            const tx = byService.telnyx || {};
+            const txActual = external.telnyx?.summary?.total_cost;
+            document.getElementById('txMinutes').textContent = formatNumber(Math.round(tx.total_quantity || 0));
+            document.getElementById('txCalls').textContent = formatNumber(tx.request_count || 0);
+            document.getElementById('txCost').textContent = formatCurrency(txActual !== undefined ? txActual : tx.total_cost);
             
             // Claude metrics
             const cl = byService.claude || {};
@@ -1491,7 +1491,7 @@
             const dateMap = {};
             dailyData.forEach(d => {
                 if (!dateMap[d.date]) {
-                    dateMap[d.date] = { deepgram: 0, twilio: 0, claude: 0 };
+                    dateMap[d.date] = { deepgram: 0, telnyx: 0, claude: 0 };
                 }
                 if (d.service && dateMap[d.date][d.service] !== undefined) {
                     dateMap[d.date][d.service] += d.cost || 0;
@@ -1500,7 +1500,7 @@
             
             const dates = Object.keys(dateMap).sort();
             const dgData = dates.map(d => dateMap[d].deepgram);
-            const twData = dates.map(d => dateMap[d].twilio);
+            const txData = dates.map(d => dateMap[d].telnyx);
             const clData = dates.map(d => dateMap[d].claude);
             
             // Format dates for display
@@ -1533,16 +1533,16 @@
                             pointHoverBorderWidth: 2
                         },
                         {
-                            label: 'Twilio',
-                            data: twData.length ? twData : [0],
-                            borderColor: '#EF4444',
-                            backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                            label: 'Telnyx',
+                            data: txData.length ? txData : [0],
+                            borderColor: '#00C26F',
+                            backgroundColor: 'rgba(0, 194, 111, 0.08)',
                             fill: true,
                             tension: 0.4,
                             borderWidth: 2,
                             pointRadius: 0,
                             pointHoverRadius: 4,
-                            pointHoverBackgroundColor: '#EF4444',
+                            pointHoverBackgroundColor: '#00C26F',
                             pointHoverBorderColor: '#fff',
                             pointHoverBorderWidth: 2
                         },
@@ -1662,7 +1662,7 @@
             agencies.forEach(([code, data]) => {
                 const services = data.services || {};
                 const dgCost = services.deepgram?.cost || 0;
-                const twCost = services.twilio?.cost || 0;
+                const txCost = services.telnyx?.cost || 0;
                 const clCost = services.claude?.cost || 0;
                 const agencyCost = data.total_cost || 0;
                 const percent = totalCost > 0 ? (agencyCost / totalCost * 100) : 0;
@@ -1671,7 +1671,7 @@
                     <tr>
                         <td><span class="agency-name">${code}</span></td>
                         <td>${formatCurrency(dgCost)}</td>
-                        <td>${formatCurrency(twCost)}</td>
+                        <td>${formatCurrency(txCost)}</td>
                         <td>${formatCurrency(clCost)}</td>
                         <td><strong>${formatCurrency(agencyCost)}</strong></td>
                         <td>
@@ -1694,7 +1694,7 @@
             const configs = [
                 { name: 'Anthropic API', ok: !external.anthropic?.error },
                 { name: 'Deepgram API', ok: !external.deepgram?.error },
-                { name: 'Twilio API', ok: !external.twilio?.error },
+                { name: 'Telnyx API', ok: !external.telnyx?.error },
                 { name: 'Render API', ok: !external.render?.error },
                 { name: 'PostgreSQL', ok: true }, // If we got here, it's working
             ];
