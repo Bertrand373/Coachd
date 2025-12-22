@@ -217,6 +217,11 @@ async def agent_answered(request: Request):
     )
     
     texml = generate_agent_conference_texml(session_id)
+    
+    # Log the TeXML being returned
+    print(f"[TeXML] Returning for session {session_id}:", flush=True)
+    print(texml, flush=True)
+    
     return texml_response(texml)
 
 

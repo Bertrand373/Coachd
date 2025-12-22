@@ -138,6 +138,7 @@ class TelnyxStreamHandler:
         try:
             self.deepgram = DeepgramClient(settings.deepgram_api_key)
             self.connection = self.deepgram.listen.live.v("1")
+            print(f"[TelnyxStream] Created Deepgram client and connection", flush=True)
             
             # Register event handlers
             self.connection.on(LiveTranscriptionEvents.Open, self._on_open)
@@ -161,7 +162,10 @@ class TelnyxStreamHandler:
                 channels=1
             )
             
+            print(f"[TelnyxStream] Starting Deepgram with options: model=nova-2, diarize=True, sample_rate={self.DEEPGRAM_SAMPLE_RATE}", flush=True)
+            
             started = self.connection.start(options)
+            print(f"[TelnyxStream] Deepgram connection.start() returned: {started}", flush=True)
             if started:
                 self.is_running = True
                 logger.info(f"[TelnyxStream] Deepgram connected with diarization")
@@ -204,11 +208,13 @@ class TelnyxStreamHandler:
         
         if event == "connected":
             logger.info(f"[TelnyxStream] Telnyx stream connected")
+            print(f"[TelnyxStream] Telnyx stream connected - full message: {message}", flush=True)
             
         elif event == "start":
             # Stream starting - contains metadata
             stream_sid = message.get("stream_sid")
             logger.info(f"[TelnyxStream] Stream started: {stream_sid}")
+            print(f"[TelnyxStream] Stream started - full message: {message}", flush=True)
             
         elif event == "media":
             # Audio data
@@ -221,6 +227,10 @@ class TelnyxStreamHandler:
                     ulaw_audio = base64.b64decode(payload)
                     self._total_audio_bytes += len(ulaw_audio)
                     
+                    # Log occasionally
+                    if self._total_audio_bytes % 16000 < 200:  # ~every second
+                        print(f"[TelnyxStream] Audio received: {self._total_audio_bytes} total bytes", flush=True)
+                    
                     # Convert μ-law to linear PCM (16-bit)
                     pcm_audio = audioop.ulaw2lin(ulaw_audio, 2)
                     
@@ -229,10 +239,19 @@ class TelnyxStreamHandler:
                     
                 except Exception as e:
                     logger.error(f"[TelnyxStream] Error processing audio: {e}")
+            elif payload and not self.connection:
+                # Got audio but no Deepgram connection
+                self._total_audio_bytes += len(base64.b64decode(payload))
+                if self._total_audio_bytes % 32000 < 400:
+                    print(f"[TelnyxStream] Audio received (no transcription): {self._total_audio_bytes} bytes", flush=True)
                     
         elif event == "stop":
             logger.info(f"[TelnyxStream] Stream stopped")
+            print(f"[TelnyxStream] Stream stopped - full message: {message}", flush=True)
             await self.stop()
+        else:
+            # Unknown event
+            print(f"[TelnyxStream] Unknown event: {event} - message: {message}", flush=True)
     
     def _on_open(self, *args, **kwargs):
         """Deepgram connection opened"""

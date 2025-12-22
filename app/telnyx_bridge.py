@@ -131,13 +131,18 @@ def generate_agent_conference_texml(session_id: str) -> str:
     - We transcribe the mixed audio stream
     """
     stream_url = settings.base_url.replace("https://", "wss://").replace("http://", "ws://")
+    full_stream_url = f"{stream_url}/ws/telnyx/stream/{session_id}"
+    
+    print(f"[TeXML] Generating for session {session_id}", flush=True)
+    print(f"[TeXML] base_url: {settings.base_url}", flush=True)
+    print(f"[TeXML] stream_url: {full_stream_url}", flush=True)
     
     # Use Gather to keep call alive - it waits for DTMF indefinitely
     # while streaming audio bidirectionally
     texml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Start>
-        <Stream url="{stream_url}/ws/telnyx/stream/{session_id}" track="both_tracks" />
+        <Stream url="{full_stream_url}" track="both_tracks" />
     </Start>
     <Gather input="dtmf" timeout="3600" numDigits="1">
     </Gather>

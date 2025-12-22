@@ -209,41 +209,61 @@ async def telnyx_stream_websocket(websocket: WebSocket, session_id: str):
     and broadcast transcripts + guidance to the frontend session WebSocket.
     """
     await websocket.accept()
-    print(f"[TelnyxStream] WebSocket connected for session {session_id}")
+    print(f"[TelnyxStream] WebSocket accepted for session {session_id}", flush=True)
     
     handler = None
+    message_count = 0
+    
     try:
         # Get or create stream handler for this session
         try:
             handler = await get_or_create_handler(session_id)
+            print(f"[TelnyxStream] Handler created successfully", flush=True)
         except Exception as e:
-            print(f"[TelnyxStream] Failed to create handler: {e}")
-            # Continue without handler - at least keep connection alive
-            # Audio won't be transcribed but call continues
+            print(f"[TelnyxStream] Failed to create handler: {e}", flush=True)
             handler = None
         
         # Update session status
         await session_manager.update_session(session_id, status=CallStatus.IN_PROGRESS)
         
         # Process incoming messages from Telnyx
+        print(f"[TelnyxStream] Waiting for messages from Telnyx...", flush=True)
         while True:
             try:
-                message = await websocket.receive_text()
-                data = json.loads(message)
+                # Try to receive - could be text or bytes
+                message = await websocket.receive()
+                message_count += 1
                 
-                if handler:
-                    await handler.handle_telnyx_message(data)
-                # If no handler, just consume messages silently
+                if message_count <= 5:
+                    print(f"[TelnyxStream] Message #{message_count} type: {message.get('type')}", flush=True)
                 
+                if "text" in message:
+                    data = json.loads(message["text"])
+                    if message_count <= 5:
+                        print(f"[TelnyxStream] Message #{message_count} event: {data.get('event')}", flush=True)
+                    if handler:
+                        await handler.handle_telnyx_message(data)
+                elif "bytes" in message:
+                    if message_count <= 3:
+                        print(f"[TelnyxStream] Received binary message: {len(message['bytes'])} bytes", flush=True)
+                    # Telnyx might send binary directly
+                    if handler and handler.connection:
+                        handler.connection.send(message["bytes"])
+                elif message.get("type") == "websocket.disconnect":
+                    print(f"[TelnyxStream] Received disconnect message", flush=True)
+                    break
+                    
             except json.JSONDecodeError as e:
-                print(f"[TelnyxStream] Invalid JSON: {e}")
+                print(f"[TelnyxStream] Invalid JSON: {e}", flush=True)
                 continue
                 
     except Exception as e:
-        print(f"[TelnyxStream] WebSocket error: {e}")
+        print(f"[TelnyxStream] WebSocket error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
         
     finally:
-        print(f"[TelnyxStream] WebSocket disconnected for session {session_id}")
+        print(f"[TelnyxStream] WebSocket disconnected. Total messages received: {message_count}", flush=True)
         if handler:
             await remove_handler(session_id)
 
