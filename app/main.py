@@ -30,6 +30,7 @@ from .websocket_handler import websocket_endpoint
 from .telnyx_bridge import is_telnyx_configured
 from .telnyx_routes import router as telnyx_router
 from .call_session import session_manager, CallStatus
+from .telnyx_stream_handler import get_or_create_handler, remove_handler
 
 # Database and usage tracking
 from .database import (
@@ -198,6 +199,44 @@ async def telnyx_session_websocket(websocket: WebSocket, session_id: str):
                 
     finally:
         await session_manager.unregister_websocket(session_id, websocket)
+
+
+@app.websocket("/ws/telnyx/stream/{session_id}")
+async def telnyx_stream_websocket(websocket: WebSocket, session_id: str):
+    """
+    WebSocket endpoint for receiving Telnyx media streams.
+    Telnyx sends audio here, we process through Deepgram with diarization,
+    and broadcast transcripts + guidance to the frontend session WebSocket.
+    """
+    await websocket.accept()
+    print(f"[TelnyxStream] WebSocket connected for session {session_id}")
+    
+    handler = None
+    try:
+        # Get or create stream handler for this session
+        handler = await get_or_create_handler(session_id)
+        
+        # Update session status
+        await session_manager.update_session(session_id, status=CallStatus.IN_PROGRESS)
+        
+        # Process incoming messages from Telnyx
+        while True:
+            try:
+                message = await websocket.receive_text()
+                data = json.loads(message)
+                await handler.handle_telnyx_message(data)
+                
+            except json.JSONDecodeError as e:
+                print(f"[TelnyxStream] Invalid JSON: {e}")
+                continue
+                
+    except Exception as e:
+        print(f"[TelnyxStream] WebSocket error: {e}")
+        
+    finally:
+        print(f"[TelnyxStream] WebSocket disconnected for session {session_id}")
+        if handler:
+            await remove_handler(session_id)
 
 
 # ============ PAGE ROUTES ============
