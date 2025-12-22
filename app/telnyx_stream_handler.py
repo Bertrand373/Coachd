@@ -137,8 +137,10 @@ class TelnyxStreamHandler:
         
         try:
             self.deepgram = DeepgramClient(settings.deepgram_api_key)
-            self.connection = self.deepgram.listen.live.v("1")
-            print(f"[TelnyxStream] Created Deepgram client and connection", flush=True)
+            
+            # Use ASYNC live client for async context
+            self.connection = self.deepgram.listen.asynclive.v("1")
+            print(f"[TelnyxStream] Created Deepgram ASYNC client", flush=True)
             
             # Register event handlers
             self.connection.on(LiveTranscriptionEvents.Open, self._on_open)
@@ -162,15 +164,11 @@ class TelnyxStreamHandler:
                 channels=1
             )
             
-            print(f"[TelnyxStream] Starting Deepgram with options: model=nova-2, diarize=True, sample_rate={self.DEEPGRAM_SAMPLE_RATE}", flush=True)
+            print(f"[TelnyxStream] Starting Deepgram async connection...", flush=True)
             
-            # In Deepgram SDK 3.x, start() returns None but connection is still valid
-            # We check if it throws an exception instead
-            self.connection.start(options)
-            print(f"[TelnyxStream] Deepgram connection started (SDK 3.x)", flush=True)
-            
-            # Give Deepgram a moment to establish
-            await asyncio.sleep(0.5)
+            # Async start
+            await self.connection.start(options)
+            print(f"[TelnyxStream] Deepgram async connection started", flush=True)
             
             self.is_running = True
             logger.info(f"[TelnyxStream] Deepgram connected with diarization")
@@ -228,9 +226,9 @@ class TelnyxStreamHandler:
                     # Convert μ-law to linear PCM (16-bit)
                     pcm_audio = audioop.ulaw2lin(ulaw_audio, 2)
                     
-                    # Send to Deepgram if connected
+                    # Send to Deepgram if connected (async)
                     if self.connection and self.is_running:
-                        self.connection.send(pcm_audio)
+                        await self.connection.send(pcm_audio)
                         
                         # Log occasionally
                         if self._total_audio_bytes % 16000 < 200:  # ~every second
@@ -565,6 +563,7 @@ class TelnyxStreamHandler:
     async def stop(self):
         """Stop the stream handler and log usage"""
         logger.info(f"[TelnyxStream] Stopping session {self.session_id}")
+        print(f"[TelnyxStream] Stopping session {self.session_id}", flush=True)
         self.is_running = False
         
         # Log Deepgram usage
@@ -580,14 +579,16 @@ class TelnyxStreamHandler:
                 model='nova-2'
             )
             logger.info(f"[TelnyxStream] Logged usage: {duration_seconds:.1f}s = ${cost:.4f}")
+            print(f"[TelnyxStream] Logged usage: {duration_seconds:.1f}s = ${cost:.4f}", flush=True)
         
-        # Close Deepgram connection
+        # Close Deepgram connection (async)
         if self.connection:
             try:
-                loop = asyncio.get_event_loop()
                 await asyncio.wait_for(
-                    loop.run_in_executor(None, self.connection.finish),
+                    self.connection.finish(),
                     timeout=3.0
+                )
+                print(f"[TelnyxStream] Deepgram connection closed", flush=True)
                 )
             except Exception as e:
                 logger.error(f"[TelnyxStream] Error closing Deepgram: {e}")
