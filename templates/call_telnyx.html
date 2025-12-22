@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>Coachd.ai | Live Call</title>
-    <!-- VERSION: 2025-12-21-telnyx-v1 -->
+    <!-- VERSION: 2025-12-22-telnyx-v2-secure-agency-gate -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -1402,6 +1402,40 @@
                 margin: 0 auto;
             }
         }
+        
+        /* ========== PAGE LOADER ========== */
+        .page-loader {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        
+        .page-loader.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        
+        .page-loader-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(0, 0, 0, 0.08);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: pageLoaderSpin 0.8s linear infinite;
+        }
+        
+        @keyframes pageLoaderSpin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -1696,6 +1730,11 @@
         </div>
     </div>
     
+    <!-- Page Loader -->
+    <div class="page-loader hidden" id="pageLoader">
+        <div class="page-loader-spinner"></div>
+    </div>
+    
     <script>
     const Coachd = (function() {
         'use strict';
@@ -1717,6 +1756,9 @@
             agentName: null,
             agentPhone: null,
             agency: null,
+            // SECURITY: Validated agency from home page
+            validatedAgencyCode: null,
+            validatedAgencyName: null,
             callType: 'phone',
             isInCall: false,
             seconds: 0,
@@ -1782,8 +1824,51 @@
         };
         
         // ==================== INIT ====================
+        
+        // SECURITY: Check for validated agency code from home page
+        function checkAgencyCode() {
+            const savedAgency = localStorage.getItem('coachd_agency');
+            if (!savedAgency) {
+                console.log('[Security] No validated agency code - redirecting to home');
+                const loader = document.getElementById('pageLoader');
+                if (loader) loader.classList.remove('hidden');
+                window.location.href = '/';
+                return null;
+            }
+            try {
+                const agency = JSON.parse(savedAgency);
+                if (!agency.code) {
+                    console.log('[Security] Invalid agency code format - redirecting to home');
+                    const loader = document.getElementById('pageLoader');
+                    if (loader) loader.classList.remove('hidden');
+                    window.location.href = '/';
+                    return null;
+                }
+                console.log('[Security] Validated agency code:', agency.code);
+                return agency;
+            } catch (e) {
+                console.log('[Security] Failed to parse agency code - redirecting to home');
+                localStorage.removeItem('coachd_agency');
+                const loader = document.getElementById('pageLoader');
+                if (loader) loader.classList.remove('hidden');
+                window.location.href = '/';
+                return null;
+            }
+        }
+        
         async function init() {
-            console.log('🚀 Coachd.ai Live Call (Telnyx) - VERSION: 2025-12-21-telnyx-v1');
+            console.log('🚀 Coachd.ai Live Call (Telnyx) - VERSION: 2025-12-22-telnyx-v2-secure');
+            
+            // SECURITY: Gate on validated agency code FIRST
+            const validatedAgency = checkAgencyCode();
+            if (!validatedAgency) {
+                return; // Redirect is happening
+            }
+            
+            // Store validated agency in state
+            state.validatedAgencyCode = validatedAgency.code;
+            state.validatedAgencyName = validatedAgency.name;
+            
             await loadAgencies();
             loadClientContext();
             checkExistingIdentity();
@@ -1839,6 +1924,16 @@
             if (saved) {
                 try {
                     const data = JSON.parse(saved);
+                    
+                    // SECURITY: Only accept saved identity if it matches validated agency
+                    if (data.agency !== state.validatedAgencyCode) {
+                        console.log('[Security] Saved agent agency mismatch - showing identify screen');
+                        localStorage.removeItem('coachd_agent');
+                        prefillAgencyDropdown();
+                        showScreen('identifyScreen');
+                        return;
+                    }
+                    
                     state.agentName = data.name;
                     state.agentPhone = data.phone;
                     state.agency = data.agency;
@@ -1846,10 +1941,23 @@
                     updatePhoneDisplay();
                     showScreen('startScreen');
                 } catch (e) {
+                    prefillAgencyDropdown();
                     showScreen('identifyScreen');
                 }
             } else {
+                prefillAgencyDropdown();
                 showScreen('identifyScreen');
+            }
+        }
+        
+        // Pre-fill and lock agency dropdown to validated agency
+        function prefillAgencyDropdown() {
+            if (state.validatedAgencyCode && dom.agencySelect) {
+                dom.agencySelect.value = state.validatedAgencyCode;
+                // Disable dropdown - agency is locked from home page validation
+                dom.agencySelect.disabled = true;
+                dom.agencySelect.style.opacity = '0.7';
+                dom.agencySelect.style.cursor = 'not-allowed';
             }
         }
         
@@ -1870,12 +1978,13 @@
         function saveIdentity() {
             const name = dom.agentName.value.trim();
             const phone = dom.agentPhone.value.trim();
-            const agency = dom.agencySelect.value;
+            // SECURITY: Use validated agency code, not dropdown value
+            const agency = state.validatedAgencyCode;
             
             // Validate phone number (at least 10 digits)
             const phoneDigits = phone.replace(/\D/g, '');
             if (!name || !agency || phoneDigits.length < 10) {
-                dom.identifyError.textContent = 'Please enter your name, phone number, and agency';
+                dom.identifyError.textContent = 'Please enter your name and phone number';
                 dom.identifyError.classList.add('show');
                 return;
             }
@@ -1911,7 +2020,8 @@
             dom.agentBadge.classList.remove('show');
             dom.agentName.value = '';
             dom.agentPhone.value = '';
-            dom.agencySelect.value = '';
+            // Agency stays locked to validated agency
+            prefillAgencyDropdown();
             showScreen('identifyScreen');
         }
         
@@ -2649,7 +2759,10 @@
         
         function goHome() {
             submitOutcome();
-            window.location.href = '/';
+            showPageLoader();
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 150);
         }
         
         function handleBack() {
@@ -2664,9 +2777,28 @@
             } else if (dom.startScreen.classList.contains('active')) {
                 goHome();
             } else if (dom.identifyScreen.classList.contains('active')) {
-                window.location.href = '/';
+                showPageLoader();
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 150);
             }
         }
+        
+        // ==================== PAGE LOADER ====================
+        function showPageLoader() {
+            const loader = document.getElementById('pageLoader');
+            if (loader) loader.classList.remove('hidden');
+        }
+        
+        function hidePageLoader() {
+            const loader = document.getElementById('pageLoader');
+            if (loader) loader.classList.add('hidden');
+        }
+        
+        // Hide loader on page load
+        window.addEventListener('load', () => {
+            setTimeout(hidePageLoader, 300);
+        });
         
         // Initialize
         init();
