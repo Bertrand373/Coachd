@@ -8,6 +8,9 @@ Production-ready with:
 - Proper error handling
 - OPTIMIZED: Reduced latency for real-time feel
 - BILLING: Complete usage tracking for Deepgram and Claude
+- V3: Phrase-based objection detection with buying signal blocking
+- V3: Two-tier model routing (Haiku for speed, Sonnet for complexity)
+- V3: Bridge phrases for smooth UX during AI generation
 """
 
 import asyncio
@@ -21,6 +24,7 @@ from .config import settings
 from .rag_engine import get_rag_engine, CallContext
 from .call_state_machine import CallStateMachine
 from .usage_tracker import log_deepgram_usage
+from .objection_detector import detect_objection, has_any_trigger, DetectionResult
 
 
 class RealtimeTranscriber:
@@ -31,11 +35,12 @@ class RealtimeTranscriber:
     #
     # Timing chain:
     #   Deepgram interim transcript → 200-400ms
-    #   Hot trigger detection       → 0ms (checked on interim)
-    #   RAG search                  → 200-300ms
-    #   Claude first token          → 400ms
-    #   WebSocket to browser        → 50ms
-    #   Total first visible:        → ~800-1000ms
+    #   Phrase detection           → <5ms (local, no AI)
+    #   Bridge phrase              → 0ms (instant)
+    #   RAG search (if needed)     → 200-300ms (skipped for known objections)
+    #   Claude first token         → 400ms (Haiku) / 600ms (Sonnet)
+    #   WebSocket to browser       → 50ms
+    #   Total first visible:       → ~700-1000ms
     #
     GUIDANCE_TIMEOUT_SECONDS = 8.0   # Max time for AI guidance generation
     GUIDANCE_COOLDOWN_SECONDS = 3.0  # Cooldown for word-count triggers
@@ -60,6 +65,7 @@ class RealtimeTranscriber:
         self._loop = None
         self._generating_guidance = False  # Prevent concurrent guidance generation
         self._agency = None  # Track agency for RAG context and billing
+        self._call_type = "presentation"  # Track call type for objection routing
         
         # Duplicate prevention: track interim triggers to skip matching finals
         self._pending_interim_text = None
@@ -133,7 +139,6 @@ class RealtimeTranscriber:
             print(f"[RT] Event handlers registered", flush=True)
             
             # Configure live transcription options
-            # Start conservative - get connection working first
             options = LiveOptions(
                 model="nova-2",
                 language="en-US",
@@ -241,7 +246,6 @@ class RealtimeTranscriber:
             return
         
         # Calculate audio duration from bytes
-        # Formula: bytes / (sample_rate * bytes_per_sample * channels) = seconds
         bytes_per_second = self.SAMPLE_RATE * self.BYTES_PER_SAMPLE * self.CHANNELS
         self._audio_duration_seconds = self._total_audio_bytes / bytes_per_second
         
@@ -306,88 +310,66 @@ class RealtimeTranscriber:
             print(f"[RT] Error handling transcript: {e}", flush=True)
     
     def _check_for_guidance_trigger(self, latest_transcript: str, is_final: bool = True):
-        """Check if we should trigger guidance generation"""
+        """Check if we should trigger guidance generation using phrase-based detection"""
         # Don't generate if already generating
         if self._generating_guidance:
             return
         
         now = time.time()
-        text_lower = latest_transcript.lower()
         
-        # EXPANDED trigger keywords - life insurance specific
-        # These trigger IMMEDIATELY, even mid-sentence
-        hot_triggers = [
-            # Price/Money - highest priority
-            "afford", "expensive", "cost", "price", "money", "budget",
-            "too much", "cheaper", "waste", "worth it", "tight",
-            # Stalling tactics
-            "think about", "talk to", "spouse", "wife", "husband",
-            "not sure", "don't know", "maybe", "later", "call me back",
-            "let me think", "need time", "sleep on it", "pray about", "pray on",
-            # Brush-offs
-            "send me information", "email me", "mail me", "send me something",
-            "already have", "don't need", "not interested", "no thanks",
-            "can't", "won't", "no way", "pass", "not for me",
-            # Trust/Skepticism
-            "scam", "pushy", "what's the catch", "fine print",
-            "too good", "sounds fishy", "pyramid", "legit",
-            # Health/Age objections
-            "too young", "too old", "healthy", "never get sick",
-            "pre-existing", "health issues", "medical",
-            # Timing
-            "bad time", "busy", "call back", "not now", "swamped",
-            # Existing coverage
-            "work insurance", "through my job", "employer", "through work",
-            "social security", "government", "va ", "veteran",
-            # Product objections
-            "term", "whole life", "universal", "cash value",
-            "investment", "stock market", "better return", "mutual fund",
-            "dave ramsey", "ramsey", "suze orman",
-            # Waiting/Process
-            "waiting period", "how long", "blood test", "exam",
-            # Decision makers
-            "check with", "ask my", "run it by"
-        ]
-        
-        has_hot_trigger = any(kw in text_lower for kw in hot_triggers)
-        
-        # HOT TRIGGERS: Fire fast on interim, skip matching final
-        if has_hot_trigger:
-            # Basic cooldown
-            if now - self.last_guidance_time < 1.0:
+        # ============ V3: PHRASE-BASED DETECTION ============
+        # Quick check first - if no potential triggers, skip full detection
+        if not has_any_trigger(latest_transcript):
+            # Fall through to word-count trigger below
+            pass
+        else:
+            # Run full phrase detection
+            detection = detect_objection(latest_transcript, self._call_type)
+            
+            # If buying signal detected, DO NOT fire objection handling
+            if detection.is_buying_signal:
+                print(f"[RT] ✅ Buying signal detected - NOT triggering objection handling", flush=True)
                 return
             
-            # DUPLICATE PREVENTION: Check if this final matches a recent interim we already handled
-            if is_final and self._pending_interim_text:
-                time_since_interim = now - self._pending_interim_time
-                if time_since_interim < 2.0:
-                    # Check if this final matches the pending interim (70% word overlap)
-                    final_words = set(text_lower.split())
-                    interim_words = set(self._pending_interim_text.lower().split())
-                    if final_words and interim_words:
-                        overlap = len(final_words & interim_words) / max(len(final_words), len(interim_words))
-                        if overlap > 0.7:
-                            print(f"[RT] Skipping final (matches interim from {time_since_interim:.1f}s ago)", flush=True)
-                            self._pending_interim_text = None  # Clear pending
-                            return
-            
-            print(f"[RT] 🔥 HOT TRIGGER detected: '{latest_transcript[:50]}...' - generating immediately", flush=True)
-            
-            # If this is an interim, store it so we can skip the matching final
-            if not is_final:
-                self._pending_interim_text = latest_transcript
-                self._pending_interim_time = now
-            else:
-                self._pending_interim_text = None  # Clear on final
-            
-            # CRITICAL: Add this transcript to buffer so guidance has content to work with
-            if latest_transcript.strip():
-                self.transcript_buffer = latest_transcript  # Use triggering text directly
-            
-            # Set timestamp immediately to prevent race condition with async
-            self.last_guidance_time = now
-            self._schedule_async(self._generate_guidance())
-            return
+            # If objection detected
+            if detection.detected:
+                # Basic cooldown
+                if now - self.last_guidance_time < 1.0:
+                    return
+                
+                # DUPLICATE PREVENTION: Check if this final matches a recent interim
+                if is_final and self._pending_interim_text:
+                    time_since_interim = now - self._pending_interim_time
+                    if time_since_interim < 2.0:
+                        text_lower = latest_transcript.lower()
+                        final_words = set(text_lower.split())
+                        interim_words = set(self._pending_interim_text.lower().split())
+                        if final_words and interim_words:
+                            overlap = len(final_words & interim_words) / max(len(final_words), len(interim_words))
+                            if overlap > 0.7:
+                                print(f"[RT] Skipping final (matches interim from {time_since_interim:.1f}s ago)", flush=True)
+                                self._pending_interim_text = None
+                                return
+                
+                print(f"[RT] 🎯 OBJECTION DETECTED: {detection.objection_type} - '{latest_transcript[:50]}...'", flush=True)
+                
+                # If this is an interim, store it so we can skip the matching final
+                if not is_final:
+                    self._pending_interim_text = latest_transcript
+                    self._pending_interim_time = now
+                else:
+                    self._pending_interim_text = None
+                
+                # Update transcript buffer with triggering text
+                if latest_transcript.strip():
+                    self.transcript_buffer = latest_transcript
+                
+                # Set timestamp immediately to prevent race condition
+                self.last_guidance_time = now
+                
+                # Schedule guidance generation with detection result
+                self._schedule_async(self._generate_guidance_v3(detection, latest_transcript))
+                return
         
         # For non-trigger situations, only check on FINAL transcripts
         if not is_final:
@@ -401,7 +383,7 @@ class RealtimeTranscriber:
         
         # Generate guidance if enough words accumulated
         if word_count > self.MIN_WORDS_FOR_GUIDANCE:
-            self.last_guidance_time = now  # Set immediately
+            self.last_guidance_time = now
             self._schedule_async(self._generate_guidance())
                    
     def _handle_error(self, *args, **kwargs):
@@ -423,9 +405,188 @@ class RealtimeTranscriber:
         
         # Log usage on unexpected close
         self._log_session_usage()
+    
+    # ============ V3: INTELLIGENT GUIDANCE GENERATION ============
+    
+    async def _generate_guidance_v3(self, detection: DetectionResult, trigger_text: str):
+        """
+        Generate guidance using the new routing system.
         
+        Routes:
+        1. Phone + known objection → Globe Life rebuttal (instant, no AI)
+        2. Presentation + known objection → Bridge phrase + Haiku
+        3. Complex objection → Bridge phrase + Sonnet + RAG
+        """
+        if not self.rag_engine:
+            print(f"[RT] No RAG engine, skipping guidance", flush=True)
+            return
+        
+        if self._generating_guidance:
+            print(f"[RT] Already generating guidance, skipping", flush=True)
+            return
+            
+        self._generating_guidance = True
+        
+        try:
+            # ============ ROUTE 1: Phone call with Globe Life rebuttal ============
+            if detection.phone_rebuttal and self._call_type == "phone":
+                print(f"[RT] 📞 Phone rebuttal - serving Globe Life script instantly", flush=True)
+                
+                # Send instant rebuttal (no AI needed)
+                await self.on_guidance({
+                    "type": "guidance_start",
+                    "chunk": detection.phone_rebuttal,
+                    "full_text": detection.phone_rebuttal,
+                    "is_complete": False
+                })
+                
+                await self.on_guidance({
+                    "type": "guidance_complete",
+                    "guidance": detection.phone_rebuttal,
+                    "trigger": trigger_text,
+                    "objection_type": detection.objection_type,
+                    "instant": True
+                })
+                
+                # Record in state machine
+                if self.state_machine:
+                    self.state_machine.record_objection(detection.objection_type, trigger_text)
+                    self.state_machine.record_guidance(detection.phone_rebuttal, trigger_text)
+                
+                return
+            
+            # ============ ROUTE 2 & 3: Presentation - Bridge + AI ============
+            
+            # Send bridge phrase IMMEDIATELY (if available)
+            if detection.bridge_phrase:
+                print(f"[RT] 🌉 Sending bridge phrase: '{detection.bridge_phrase}'", flush=True)
+                await self.on_guidance({
+                    "type": "bridge",
+                    "text": detection.bridge_phrase,
+                    "objection_type": detection.objection_type
+                })
+            
+            # Record objection in state machine
+            if self.state_machine:
+                self.state_machine.record_objection(detection.objection_type, trigger_text)
+            
+            # Notify frontend of objection type (for UI updates)
+            if detection.objection_type == "price":
+                await self.on_guidance({
+                    "type": "price_objection",
+                    "trigger": trigger_text[:100]
+                })
+            
+            # Generate AI guidance
+            await self._stream_ai_guidance(detection, trigger_text)
+            
+        except Exception as e:
+            print(f"[RT] Error in guidance generation: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+        finally:
+            self._generating_guidance = False
+            self.transcript_buffer = ""
+    
+    async def _stream_ai_guidance(self, detection: DetectionResult, trigger_text: str):
+        """Stream AI-generated guidance with appropriate model and context."""
+        full_text = ""
+        first_chunk = True
+        batch_buffer = ""
+        last_send_time = time.time()
+        BATCH_INTERVAL = 0.08  # 80ms batching for smooth streaming
+        
+        try:
+            # Get call state
+            call_state = self.state_machine.get_state_for_claude() if self.state_machine else {}
+            
+            # Choose generation method based on routing
+            if detection.skip_rag and detection.use_fast_model:
+                # FAST PATH: Haiku with lean prompt (known objections)
+                print(f"[RT] ⚡ Using FAST path (Haiku, skip RAG) for {detection.objection_type}", flush=True)
+                guidance_stream = self.rag_engine.generate_guidance_fast(
+                    call_state,
+                    detection.objection_type,
+                    trigger_text,
+                    agency=self._agency,
+                    session_id=self._session_id
+                )
+            elif detection.use_fast_model:
+                # MEDIUM PATH: Haiku with full context
+                print(f"[RT] 🚀 Using MEDIUM path (Haiku, with RAG) for {detection.objection_type}", flush=True)
+                guidance_stream = self.rag_engine.generate_guidance_stream_v2(
+                    call_state,
+                    trigger_text,
+                    agency=self._agency,
+                    session_id=self._session_id,
+                    use_fast_model=True
+                )
+            else:
+                # THOROUGH PATH: Sonnet with full context and RAG
+                print(f"[RT] 🔍 Using THOROUGH path (Sonnet, with RAG) for {detection.objection_type}", flush=True)
+                guidance_stream = self.rag_engine.generate_guidance_stream_v2(
+                    call_state,
+                    trigger_text,
+                    agency=self._agency,
+                    session_id=self._session_id,
+                    use_fast_model=False
+                )
+            
+            # Stream guidance
+            for chunk in guidance_stream:
+                if chunk:
+                    full_text += chunk
+                    batch_buffer += chunk
+                    
+                    now = time.time()
+                    
+                    if first_chunk or (now - last_send_time) >= BATCH_INTERVAL:
+                        if first_chunk:
+                            print(f"[RT] First guidance chunk received, streaming...", flush=True)
+                        
+                        await self.on_guidance({
+                            "type": "guidance_start" if first_chunk else "guidance_chunk",
+                            "chunk": batch_buffer,
+                            "full_text": full_text,
+                            "is_complete": False
+                        })
+                        
+                        batch_buffer = ""
+                        last_send_time = now
+                        first_chunk = False
+            
+            # Send remaining buffer
+            if batch_buffer:
+                await self.on_guidance({
+                    "type": "guidance_chunk",
+                    "chunk": batch_buffer,
+                    "full_text": full_text,
+                    "is_complete": False
+                })
+            
+            # Send completion
+            if full_text:
+                print(f"[RT] Guidance complete ({len(full_text)} chars)", flush=True)
+                
+                if self.state_machine:
+                    self.state_machine.record_guidance(full_text, trigger_text)
+                
+                await self.on_guidance({
+                    "type": "guidance_complete",
+                    "guidance": full_text,
+                    "trigger": trigger_text,
+                    "objection_type": detection.objection_type
+                })
+                
+        except Exception as e:
+            print(f"[RT] Error streaming AI guidance: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+    
+    # ============ LEGACY GUIDANCE (word-count triggered) ============
+    
     async def _generate_guidance(self):
-        """Generate AI guidance based on transcript buffer with timeout"""
+        """Generate AI guidance based on transcript buffer with timeout (legacy path)"""
         if not self.rag_engine:
             print(f"[RT] No RAG engine, skipping guidance", flush=True)
             return
@@ -443,7 +604,6 @@ class RealtimeTranscriber:
         print(f"[RT] Starting guidance generation for: '{self.transcript_buffer[:60]}...'", flush=True)
         
         try:
-            # Run guidance generation with timeout
             try:
                 result = await asyncio.wait_for(
                     self._do_generate_guidance(),
@@ -456,7 +616,6 @@ class RealtimeTranscriber:
             except asyncio.TimeoutError:
                 print(f"[RT] WARNING: Guidance generation timed out after {self.GUIDANCE_TIMEOUT_SECONDS}s", flush=True)
             
-            # Clear buffer after processing
             self.transcript_buffer = ""
             
         except Exception as e:
@@ -467,13 +626,13 @@ class RealtimeTranscriber:
             self._generating_guidance = False
     
     async def _do_generate_guidance(self) -> Optional[dict]:
-        """Stream guidance tokens to client in real-time with batched updates for smooth display"""
+        """Stream guidance tokens to client (legacy path for word-count triggers)"""
         try:
             full_text = ""
             first_chunk = True
             batch_buffer = ""
             last_send_time = time.time()
-            BATCH_INTERVAL = 0.08  # Send updates every 80ms for smooth visual streaming
+            BATCH_INTERVAL = 0.08
             
             print(f"[RT] Calling RAG engine for guidance...", flush=True)
             
@@ -484,23 +643,21 @@ class RealtimeTranscriber:
                     "type": "price_objection",
                     "trigger": self.transcript_buffer[-100:]
                 })
-                # Record in state machine
                 if self.state_machine:
                     self.state_machine.record_objection("price", self.transcript_buffer[-200:])
             
-            # Use V2 with full state if state machine exists, otherwise legacy
+            # Use V2 with full state if state machine exists
             if self.state_machine:
                 call_state = self.state_machine.get_state_for_claude()
-                print(f"[RT] Using V2 guidance (phase={call_state.get('presentation_context', {}).get('current_phase', 'N/A')}, down_close={call_state.get('down_close_level', 0)})", flush=True)
+                print(f"[RT] Using V2 guidance", flush=True)
                 
                 guidance_stream = self.rag_engine.generate_guidance_stream_v2(
                     call_state,
-                    self.transcript_buffer,  # Full buffer - state machine handles limits
+                    self.transcript_buffer,
                     agency=self._agency,
                     session_id=self._session_id
                 )
             else:
-                # Legacy fallback
                 print(f"[RT] Using legacy guidance (no state machine)", flush=True)
                 guidance_stream = self.rag_engine.generate_guidance_stream(
                     self.transcript_buffer,
@@ -517,13 +674,10 @@ class RealtimeTranscriber:
                     
                     now = time.time()
                     
-                    # Send first chunk immediately for instant feedback
-                    # Then batch subsequent chunks for smooth streaming effect
                     if first_chunk or (now - last_send_time) >= BATCH_INTERVAL:
                         if first_chunk:
                             print(f"[RT] First guidance chunk received, streaming to client...", flush=True)
                         
-                        # Send batched content
                         await self.on_guidance({
                             "type": "guidance_start" if first_chunk else "guidance_chunk",
                             "chunk": batch_buffer,
@@ -535,7 +689,6 @@ class RealtimeTranscriber:
                         last_send_time = now
                         first_chunk = False
             
-            # Send any remaining buffered content
             if batch_buffer:
                 await self.on_guidance({
                     "type": "guidance_chunk",
@@ -544,11 +697,9 @@ class RealtimeTranscriber:
                     "is_complete": False
                 })
             
-            # Send completion signal
             if full_text:
-                print(f"[RT] Guidance complete ({len(full_text)} chars), sending completion signal", flush=True)
+                print(f"[RT] Guidance complete ({len(full_text)} chars)", flush=True)
                 
-                # Record in state machine for history
                 if self.state_machine:
                     self.state_machine.record_guidance(
                         full_text,
@@ -577,7 +728,8 @@ class RealtimeTranscriber:
         # Update legacy context (fallback)
         if "call_type" in context_data:
             self.call_context.call_type = context_data["call_type"]
-            print(f"[RT] Call type set to: {self.call_context.call_type}", flush=True)
+            self._call_type = context_data["call_type"]  # Track for objection routing
+            print(f"[RT] Call type set to: {self._call_type}", flush=True)
         if "current_product" in context_data:
             self.call_context.current_product = context_data["current_product"]
         if "client_age" in context_data:
@@ -633,10 +785,8 @@ class RealtimeTranscriber:
             last_send_time = time.time()
             BATCH_INTERVAL = 0.08
             
-            # Get full state for context
             call_state = self.state_machine.get_state_for_claude()
             
-            # Build specific down-close prompt
             down_close_prompt = f"""The client just said they can't afford the coverage. The agent clicked to reduce coverage.
 
 DOWN-CLOSE LEVEL: {level} - {label}
@@ -654,7 +804,8 @@ Based on the conversation so far, give the agent EXACTLY what to say to present 
                 call_state,
                 down_close_prompt,
                 agency=self._agency,
-                session_id=self._session_id
+                session_id=self._session_id,
+                use_fast_model=True  # Use Haiku for speed
             ):
                 if chunk:
                     full_text += chunk
@@ -702,6 +853,7 @@ Based on the conversation so far, give the agent EXACTLY what to say to present 
         return {
             "session_id": self._session_id,
             "agency": self._agency,
+            "call_type": self._call_type,
             "audio_bytes": self._total_audio_bytes,
             "audio_duration_seconds": current_duration,
             "is_running": self.is_running,

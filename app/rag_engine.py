@@ -8,6 +8,10 @@ V2: Full call state awareness for intelligent, contextual guidance
 - Suggests down-closes intelligently
 - Recognizes when to gracefully exit
 
+V3: Two-tier model routing
+- Haiku: Fast responses (~800ms) for known objections (price, spouse, stall)
+- Sonnet: Thorough responses for complex cases (health, trust, multi-objection)
+
 With complete usage tracking for billing accuracy.
 """
 
@@ -101,6 +105,140 @@ class RAGEngine:
         ]
         lower = transcript.lower()
         return any(kw in lower for kw in price_keywords)
+    
+    # ============ V3: FAST PATH (HAIKU) FOR KNOWN OBJECTIONS ============
+    
+    def generate_guidance_fast(
+        self,
+        call_state: Dict[str, Any],
+        objection_type: str,
+        trigger_text: str,
+        agency: Optional[str] = None,
+        session_id: Optional[str] = None
+    ) -> Generator[str, None, None]:
+        """
+        Generate guidance using Haiku with a lean prompt.
+        
+        Used for known objections (price, spouse, stall, covered).
+        Skips RAG search - uses hardcoded context based on objection type.
+        Target: ~800ms to first token.
+        """
+        
+        # Extract only what's needed from call state
+        client_profile = call_state.get("client_profile", "Unknown")
+        down_close_level = call_state.get("down_close_level", 0)
+        coverage_summary = call_state.get("coverage_summary", "")
+        recent_transcript = call_state.get("recent_transcript", trigger_text)[-2000:]  # Last 2k chars only
+        
+        # Build lean system prompt based on objection type
+        system_prompt = self._build_lean_prompt(
+            objection_type=objection_type,
+            client_profile=client_profile,
+            down_close_level=down_close_level,
+            coverage_summary=coverage_summary
+        )
+        
+        # Short user message
+        user_message = f"""Client just said: "{trigger_text}"
+
+Recent conversation:
+"{recent_transcript[-500:]}"
+
+Give the agent EXACT WORDS to say. 2-3 sentences max."""
+
+        messages = [{"role": "user", "content": user_message}]
+        
+        # Use Haiku for speed
+        model = settings.claude_model_fast
+        
+        with self.client.messages.stream(
+            model=model,
+            max_tokens=200,  # Short responses
+            system=system_prompt,
+            messages=messages
+        ) as stream:
+            for text in stream.text_stream:
+                yield text
+            
+            final_message = stream.get_final_message()
+            
+            log_claude_usage(
+                input_tokens=final_message.usage.input_tokens,
+                output_tokens=final_message.usage.output_tokens,
+                agency_code=agency,
+                session_id=session_id,
+                model=model,
+                operation='guidance_fast'
+            )
+    
+    def _build_lean_prompt(
+        self, 
+        objection_type: str,
+        client_profile: str,
+        down_close_level: int,
+        coverage_summary: str
+    ) -> str:
+        """Build minimal prompt for fast Haiku responses."""
+        
+        # Objection-specific handling instructions
+        objection_handlers = {
+            "price": f"""PRICE OBJECTION - Client can't afford current offer.
+
+CLIENT: {client_profile}
+COVERAGE: {coverage_summary}
+DOWN-CLOSE LEVEL: {down_close_level}
+
+STRATEGY: Reduce coverage, not products.
+- Level 0-1: Reduce Final Expense $30k → $15k
+- Level 2: Reduce to $10k  
+- Level 3+: "Which benefit could you go without?"
+
+Give exact words to present lower coverage option.""",
+
+            "spouse": f"""SPOUSE OBJECTION - Client needs to talk to partner.
+
+CLIENT: {client_profile}
+
+STRATEGY: Get their opinion first, then handle spouse later.
+SAY: "I completely understand. What do YOU think about it so far? 
+If it made sense to you, what do you think your spouse would say?"
+
+Give exact words that get the client's own opinion first.""",
+
+            "stall": f"""THINK ABOUT IT OBJECTION - Client is stalling.
+
+CLIENT: {client_profile}
+
+STRATEGY: Find the REAL objection (need vs afford).
+SAY: "I understand - it's a big decision. Usually when folks want to think about it, 
+it comes down to: do they NEED it, or can they AFFORD it. Which is it for you?"
+
+Give exact words to uncover the real objection.""",
+
+            "covered": f"""ALREADY COVERED OBJECTION - Client has existing insurance.
+
+CLIENT: {client_profile}
+
+STRATEGY: Existing coverage was already factored in during needs analysis.
+SAY: "Yes, and the Needs Analysis already took that into consideration. 
+It exposed that what you have is good, but it's not enough to fully protect your family."
+
+Give exact words acknowledging their coverage while showing the gap.""",
+        }
+        
+        handler = objection_handlers.get(objection_type, f"""
+OBJECTION: {objection_type}
+CLIENT: {client_profile}
+
+Give the agent exact words to handle this objection. 2-3 sentences.""")
+        
+        return f"""You are Coachd, a real-time sales coach for Globe Life agents.
+Give IMMEDIATE, ACTIONABLE guidance. No explanations - just exact words to say.
+
+{handler}
+
+FORMAT: Start with quotes - "Exact words to say..."
+Keep it to 2-3 sentences. The agent needs to respond NOW."""
     
     # ============ V2: FULL STATE-AWARE GUIDANCE ============
     
@@ -411,12 +549,18 @@ DO NOT:
         call_state: Dict[str, Any],
         trigger_text: str,
         agency: Optional[str] = None,
-        session_id: Optional[str] = None
+        session_id: Optional[str] = None,
+        use_fast_model: bool = False
     ) -> Generator[str, None, None]:
         """
         Stream guidance tokens using full call state.
         
-        This is the V2 method that provides intelligent, context-aware guidance.
+        Args:
+            call_state: Full call state from state machine
+            trigger_text: The text that triggered guidance
+            agency: Agency code for RAG and billing
+            session_id: Session ID for billing
+            use_fast_model: If True, use Haiku instead of Sonnet
         """
         
         # Get relevant context from agency's knowledge base
@@ -436,7 +580,7 @@ DO NOT:
         recent_transcript = call_state.get("recent_transcript", trigger_text)
         active_objection = call_state.get("active_objection", "")
         
-        # Build user message - use full transcript (already capped at 8000 chars by state machine)
+        # Build user message
         if active_objection:
             user_message = f"""OBJECTION DETECTED: {active_objection.upper()}
 
@@ -456,27 +600,28 @@ Provide guidance for the agent."""
         
         messages = [{"role": "user", "content": user_message}]
         
+        # Select model based on routing
+        model = settings.claude_model_fast if use_fast_model else settings.claude_model
+        
         # Stream the response
         with self.client.messages.stream(
-            model=settings.claude_model,
-            max_tokens=400,  # Allow guidance to be as long as genuinely needed
+            model=model,
+            max_tokens=400,
             system=system_prompt,
             messages=messages
         ) as stream:
             for text in stream.text_stream:
                 yield text
             
-            # Get final message to access usage stats
             final_message = stream.get_final_message()
             
-            # Log Claude usage for billing
             log_claude_usage(
                 input_tokens=final_message.usage.input_tokens,
                 output_tokens=final_message.usage.output_tokens,
                 agency_code=agency,
                 session_id=session_id,
-                model=settings.claude_model,
-                operation='guidance_v2'
+                model=model,
+                operation='guidance_v2_fast' if use_fast_model else 'guidance_v2'
             )
     
     # ============ LEGACY METHODS (kept for backward compatibility) ============
@@ -565,7 +710,6 @@ RESPONSE FORMAT: Give EXACTLY what to say. 1-3 sentences max. No headers or emoj
     ) -> str:
         """Generate guidance based on a transcript chunk and call context (legacy)"""
         
-        # Get relevant context from agency's knowledge base
         relevant_context = self.get_relevant_context(
             transcript_chunk,
             category=call_context.current_product,
@@ -591,7 +735,6 @@ RESPONSE FORMAT: Give EXACTLY what to say. 1-3 sentences max. No headers or emoj
             messages=messages
         )
         
-        # Log Claude usage for billing
         log_claude_usage(
             input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,
@@ -610,11 +753,8 @@ RESPONSE FORMAT: Give EXACTLY what to say. 1-3 sentences max. No headers or emoj
         agency: Optional[str] = None,
         session_id: Optional[str] = None
     ) -> Generator[str, None, None]:
-        """
-        Stream guidance tokens as they're generated (legacy).
-        """
+        """Stream guidance tokens as they're generated (legacy)."""
         
-        # Get relevant context from agency's knowledge base
         relevant_context = self.get_relevant_context(
             transcript_chunk,
             category=call_context.current_product,
@@ -633,7 +773,6 @@ RESPONSE FORMAT: Give EXACTLY what to say. 1-3 sentences max. No headers or emoj
             }
         ]
         
-        # Stream the response and track usage
         with self.client.messages.stream(
             model=settings.claude_model,
             max_tokens=500,
@@ -643,10 +782,8 @@ RESPONSE FORMAT: Give EXACTLY what to say. 1-3 sentences max. No headers or emoj
             for text in stream.text_stream:
                 yield text
             
-            # Get final message to access usage stats
             final_message = stream.get_final_message()
             
-            # Log Claude usage for billing
             log_claude_usage(
                 input_tokens=final_message.usage.input_tokens,
                 output_tokens=final_message.usage.output_tokens,
@@ -692,7 +829,6 @@ Respond in JSON format:
             messages=messages
         )
         
-        # Log Claude usage for billing
         log_claude_usage(
             input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,

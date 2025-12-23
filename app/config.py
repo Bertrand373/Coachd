@@ -36,8 +36,11 @@ class Settings(BaseSettings):
     chroma_persist_dir: str = "/data/chroma_db" if os.path.exists("/data") else "./chroma_db"
     documents_dir: str = "/data/documents" if os.path.exists("/data") else "./documents"
     
-    # AI Settings
+    # AI Settings - Two-tier model strategy
+    # Sonnet: Full context, complex objections (health, trust, multi-objection)
     claude_model: str = "claude-sonnet-4-20250514"
+    # Haiku: Fast responses for known objections (price, spouse, stall)
+    claude_model_fast: str = "claude-3-5-haiku-20241022"
     
     # RAG Settings
     chunk_size: int = 500
