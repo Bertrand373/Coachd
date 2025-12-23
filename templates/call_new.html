@@ -474,10 +474,19 @@
         .change-agent:hover { color: var(--text-secondary); }
         
         /* ========== CALL SCREEN ========== */
-        .call-screen { position: relative; }
+        .call-screen { 
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
         
         .teleprompter {
-            flex: 1;
+            flex: 1 1 0;  /* Grow, shrink, and start from 0 */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -486,19 +495,19 @@
             text-align: center;
             cursor: pointer;
             transition: background 0.2s;
-            /* iOS Safari scroll fix */
-            height: 0;  /* Force flex to calculate height properly */
-            min-height: 0;
+            /* iOS Safari scroll fix - CRITICAL */
             overflow-y: auto;
             overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
-            position: relative;  /* Establish scroll context */
+            min-height: 0;  /* Allow flex item to shrink below content size */
+            position: relative;
         }
         
         /* When guidance is showing, start from top so user can scroll */
         .teleprompter.has-guidance {
             justify-content: flex-start;
-            padding-top: 40px;
+            padding-top: 24px;
+            padding-bottom: 60px;  /* Extra padding for scroll content */
         }
         
         .teleprompter:active { background: var(--surface); }
@@ -551,7 +560,6 @@
             width: 100%;
             max-width: 600px;
             padding-bottom: 40px;
-            flex-shrink: 0;  /* iOS fix: prevent collapse */
         }
         
         .guidance-state.active { 
@@ -577,6 +585,9 @@
             color: var(--text);
             text-align: center;
             margin-bottom: 32px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            padding: 0 16px;  /* Side padding for mobile */
         }
         
         /* Bold key phrases for quick scanning */
@@ -2480,6 +2491,10 @@
             
             // Clear streaming state
             state.streamingGuidance = '';
+            
+            // Reset notification flag so NEXT objection can ding
+            // (This guidance is complete, next one should trigger fresh notification)
+            state.hasVibratedForCurrentGuidance = false;
         }
         
         function formatGuidanceText(text) {
