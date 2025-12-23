@@ -106,6 +106,8 @@ class RealtimeTranscriber:
         # V4: Speaker identification
         self._agent_speaker_id = None  # None until identified
         self._call_start_time = None   # Track when call started
+        self._client_id = None         # Client ID from frontend (e.g., "browser_abc123")
+        self._is_browser_test = False  # True if this is a browser mic test session
         
         # ============ USAGE TRACKING ============
         self._session_id = str(uuid.uuid4())  # Unique session ID for tracking
@@ -374,6 +376,11 @@ class RealtimeTranscriber:
         
         If diarization doesn't return speaker IDs, falls back to pattern matching only.
         """
+        # V4: Skip speaker filtering in browser test mode
+        # Browser mic tests have only one voice, so all speech = client speech
+        if self._is_browser_test:
+            return True
+        
         text_lower = transcript.lower()
         now = time.time()
         
@@ -831,6 +838,14 @@ class RealtimeTranscriber:
             
     def update_context(self, context_data: dict):
         """Update call context with client information"""
+        # Track client ID for test mode detection
+        if "client_id" in context_data:
+            self._client_id = context_data["client_id"]
+            # Detect browser test mode - browser mic tests use "browser_" prefix
+            self._is_browser_test = self._client_id.startswith("browser_")
+            if self._is_browser_test:
+                print(f"[RT] 🧪 BROWSER TEST MODE - speaker filtering disabled", flush=True)
+        
         # Update legacy context (fallback)
         if "call_type" in context_data:
             self.call_context.call_type = context_data["call_type"]

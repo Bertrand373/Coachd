@@ -486,6 +486,14 @@
             text-align: center;
             cursor: pointer;
             transition: background 0.2s;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* When guidance is showing, allow scrolling from top */
+        .teleprompter:has(.guidance-state.active) {
+            justify-content: flex-start;
+            padding-top: 40px;
         }
         
         .teleprompter:active { background: var(--surface); }
@@ -537,6 +545,9 @@
             align-items: center;
             width: 100%;
             max-width: 600px;
+            max-height: 100%;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
         
         .guidance-state.active { 
@@ -2240,6 +2251,7 @@
             if (state.ws && state.ws.readyState === WebSocket.OPEN) {
                 // Format context for backend (matches websocket_handler.py expectations)
                 const contextData = {
+                    client_id: state.clientId,  // For browser test mode detection
                     call_type: state.callType,
                     agency: state.agency,
                     product: state.clientContext.product,
