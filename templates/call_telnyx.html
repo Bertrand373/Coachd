@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>Coachd.ai | Live Call</title>
-    <!-- VERSION: 2025-12-24-v8-ai-builds-to-close -->
+    <!-- VERSION: 2025-12-24-v9-click-to-call -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -548,6 +548,54 @@
 
         .call-type-hint {
             font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            text-align: center;
+        }
+        
+        /* ========== CLIENT PHONE INPUT ========== */
+        .client-phone-section {
+            width: 100%;
+            max-width: 280px;
+            margin-bottom: 24px;
+            text-align: left;
+        }
+        
+        .client-phone-section .form-label {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+        }
+        
+        .client-phone-section .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            font-variant-numeric: tabular-nums;
+            color: var(--text);
+            background: transparent;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .client-phone-section .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
+        }
+        
+        .client-phone-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            text-align: center;
+        }
             color: var(--text-muted);
             margin-top: 8px;
             text-align: center;
@@ -1584,13 +1632,24 @@
                 </svg>
             </div>
             <h1 class="start-title">Ready to Coach</h1>
-            <p class="start-subtitle">We'll call your phone. Answer and dial your client using 3-way calling.</p>
+            <p class="start-subtitle">Enter client's number below, or leave blank for 3-way calling.</p>
             
             <div class="start-phone-display" id="phoneDisplay">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                 </svg>
                 <span id="phoneDisplayNumber">(404) 555-1234</span>
+            </div>
+            
+            <!-- Client Phone Input for Click-to-Call -->
+            <div class="client-phone-section">
+                <label class="form-label">CLIENT PHONE NUMBER</label>
+                <input type="tel" 
+                       id="clientPhoneInput" 
+                       class="form-input"
+                       placeholder="(555) 123-4567"
+                       autocomplete="tel">
+                <div class="client-phone-hint">We'll dial your client after you answer</div>
             </div>
             
             <!-- Call Type Selector -->
@@ -1817,6 +1876,7 @@
             sessionId: null,
             agentName: null,
             agentPhone: null,
+            clientPhone: null,  // Client phone for click-to-call
             agency: null,
             // SECURITY: Validated agency from home page
             validatedAgencyCode: null,
@@ -1874,6 +1934,7 @@
             get agentBadgeName() { return document.getElementById('agentBadgeName'); },
             get phoneDisplay() { return document.getElementById('phoneDisplay'); },
             get phoneDisplayNumber() { return document.getElementById('phoneDisplayNumber'); },
+            get clientPhoneInput() { return document.getElementById('clientPhoneInput'); },
             get captionsDot() { return document.getElementById('captionsDot'); },
             get agentCaptionLine() { return document.getElementById('agentCaptionLine'); },
             get callerCaptionLine() { return document.getElementById('callerCaptionLine'); },
@@ -2220,16 +2281,33 @@
         // ==================== TELNYX CALL FLOW ====================
         async function startCall() {
             dom.startBtn.disabled = true;
+            
+            // Get client phone if provided (click-to-call mode)
+            const clientPhone = dom.clientPhoneInput?.value?.trim() || '';
+            state.clientPhone = clientPhone;
+            
             setStatus('connecting');
             showScreen('connectingScreen');
             
+            // Update connecting screen message based on mode
+            const connectingTitle = document.querySelector('.connecting-title');
+            const connectingSubtitle = document.querySelector('.connecting-subtitle');
+            if (clientPhone) {
+                if (connectingTitle) connectingTitle.textContent = 'Calling Your Phone...';
+                if (connectingSubtitle) connectingSubtitle.textContent = 'Answer, then we\'ll dial your client';
+            } else {
+                if (connectingTitle) connectingTitle.textContent = 'Calling Your Phone...';
+                if (connectingSubtitle) connectingSubtitle.textContent = 'Answer and 3-way in your client';
+            }
+            
             try {
-                // Call the Telnyx API to initiate call to agent
+                // Call the Telnyx API - include client_phone for click-to-call
                 const response = await fetch(CONFIG.telnyxStartEndpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        agent_phone: state.agentPhone
+                        agent_phone: state.agentPhone,
+                        client_phone: clientPhone || null  // null triggers legacy 3-way mode
                     })
                 });
                 
@@ -2335,6 +2413,19 @@
                     console.log('✅ Speakers identified:', msg.message);
                     setStatus('Coaching active');
                     break;
+                case 'client_dialing':
+                    // Click-to-call: Dialing client now
+                    console.log('📞 Dialing client...');
+                    const dialingTitle = document.querySelector('.connecting-title');
+                    if (dialingTitle) dialingTitle.textContent = 'Dialing Client...';
+                    const dialingSubtitle = document.querySelector('.connecting-subtitle');
+                    if (dialingSubtitle) dialingSubtitle.textContent = 'Connecting you now';
+                    break;
+                case 'client_connected':
+                    // Click-to-call: Client answered
+                    console.log('✅ Client connected!');
+                    onCallConnected();
+                    break;
                 case 'guidance':
                     handleGuidance(msg);
                     break;
@@ -2400,6 +2491,16 @@
             }
             
             console.log('[Call] Connected and listening');
+            
+            // Update hint based on call mode
+            const listeningHint = document.querySelector('.listening-hint');
+            if (listeningHint) {
+                if (state.clientPhone) {
+                    listeningHint.textContent = 'Connected — coaching active';
+                } else {
+                    listeningHint.textContent = '3-way in your client now';
+                }
+            }
         }
         
         function cancelCall() {
@@ -2896,6 +2997,8 @@
             state.selectedTipIndex = null;
             state.downCloseLevel = 0;
             state.sessionId = null;
+            state.clientPhone = null;
+            if (dom.clientPhoneInput) dom.clientPhoneInput.value = '';
             dismissGuidance();
             resetCaptions();
             showScreen('startScreen');

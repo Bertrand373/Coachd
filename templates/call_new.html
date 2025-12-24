@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>Coachd.ai | Live Call</title>
-    <!-- VERSION: 2025-12-24-v8-ai-builds-to-close -->
+    <!-- VERSION: 2025-12-24-v9-click-to-call -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -70,7 +70,6 @@
             height: 100dvh;
             padding-top: var(--safe-top);
             padding-bottom: var(--safe-bottom);
-            overflow: hidden;  /* Establish scroll boundary */
         }
         
         /* ========== HEADER ========== */
@@ -192,6 +191,15 @@
             animation: spin 1s linear infinite;
         }
         
+        .status-indicator.ringing {
+            background: var(--accent-soft);
+        }
+        
+        .status-indicator.ringing svg {
+            color: var(--accent-dark);
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
         .status-indicator.error {
             background: var(--danger-soft);
         }
@@ -205,13 +213,16 @@
             to { transform: rotate(360deg); }
         }
         
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
         /* ========== SCREENS ========== */
         .screen {
             display: none;
             flex: 1;
             flex-direction: column;
-            min-height: 0;  /* Allow screen to be constrained by parent */
-            overflow: hidden;
         }
         
         .screen.active { display: flex; }
@@ -311,6 +322,10 @@
         
         input[type="number"] {
             -moz-appearance: textfield;
+        }
+        
+        input[type="tel"] {
+            font-variant-numeric: tabular-nums;
         }
         
         .form-select {
@@ -423,8 +438,30 @@
             font-size: 0.9rem;
             color: var(--text-secondary);
             margin-bottom: 32px;
-            max-width: 260px;
+            max-width: 280px;
             line-height: 1.5;
+        }
+        
+        .start-phone-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px 20px;
+            background: var(--surface);
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text);
+        }
+        
+        .start-phone-display svg {
+            width: 18px;
+            height: 18px;
+            min-width: 18px;
+            flex-shrink: 0;
+            color: var(--accent-dark);
         }
         
         .start-btn {
@@ -443,26 +480,13 @@
             cursor: pointer;
             transition: all 0.2s ease;
             width: 100%;
-            max-width: 260px;
+            max-width: 280px;
         }
         
         .start-btn:hover:not(:disabled) { transform: translateY(-2px); }
         .start-btn:active:not(:disabled) { transform: scale(0.98); }
         .start-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .start-btn svg { width: 22px; height: 22px; }
-        
-        .test-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            margin-top: 20px;
-            padding: 8px 14px;
-            background: var(--accent-soft);
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: var(--accent-dark);
-        }
         
         .change-agent {
             margin-top: 16px;
@@ -475,6 +499,171 @@
         }
         
         .change-agent:hover { color: var(--text-secondary); }
+        
+        /* ========== CALL TYPE SELECTOR ========== */
+        .call-type-selector {
+            width: 100%;
+            max-width: 280px;
+            margin-bottom: 24px;
+        }
+
+        .call-type-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .call-type-buttons {
+            display: flex;
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .call-type-btn {
+            flex: 1;
+            padding: 12px 8px;
+            background: transparent;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .call-type-btn.active {
+            background: var(--bg);
+            color: var(--text);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .call-type-btn:hover:not(.active) { color: var(--text); }
+
+        .call-type-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            text-align: center;
+        }
+        
+        /* ========== CLIENT PHONE INPUT ========== */
+        .client-phone-section {
+            width: 100%;
+            max-width: 280px;
+            margin-bottom: 24px;
+            text-align: left;
+        }
+        
+        .client-phone-section .form-label {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+        }
+        
+        .client-phone-section .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            font-variant-numeric: tabular-nums;
+            color: var(--text);
+            background: transparent;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .client-phone-section .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
+        }
+        
+        .client-phone-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            text-align: center;
+        }
+            color: var(--text-muted);
+            margin-top: 8px;
+            text-align: center;
+        }
+        
+        /* ========== CONNECTING SCREEN ========== */
+        .connecting-screen {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 40px 24px;
+        }
+        
+        .connecting-icon {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 24px;
+            background: var(--accent-soft);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: ringPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes ringPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4); }
+            50% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(96, 165, 250, 0); }
+        }
+        
+        .connecting-icon svg {
+            width: 36px;
+            height: 36px;
+            color: var(--accent-dark);
+        }
+        
+        .connecting-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .connecting-subtitle {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            max-width: 260px;
+            line-height: 1.5;
+        }
+        
+        .connecting-cancel {
+            padding: 12px 24px;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .connecting-cancel:hover {
+            background: var(--surface);
+            color: var(--text);
+        }
         
         /* ========== CALL SCREEN ========== */
         .call-screen { 
@@ -558,6 +747,12 @@
             font-size: 1.1rem;
             font-weight: 600;
             color: var(--text-secondary);
+        }
+        
+        .listening-hint {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 8px;
         }
         
         .guidance-state {
@@ -790,6 +985,49 @@
         }
         
         .end-btn svg { width: 18px; height: 18px; }
+        
+        /* Down-Close Level Indicator */
+        .down-close-indicator {
+            display: none;
+            background: linear-gradient(135deg, #1e3a5f 0%, #0f1f33 100%);
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin: 0 16px 8px 16px;
+            flex-shrink: 0;
+        }
+        .down-close-indicator.active { display: block; }
+        .down-close-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .down-close-badge {
+            background: rgba(96, 165, 250, 0.2);
+            color: #60A5FA;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+        .down-close-badge.floor {
+            background: rgba(239, 68, 68, 0.2);
+            color: #EF4444;
+        }
+        .down-close-title {
+            color: #FFFFFF;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .down-close-message {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+        .down-close-message.floor-message {
+            color: #FCD34D;
+            font-weight: 500;
+        }
         
         /* ========== OUTCOME SCREEN ========== */
         .outcome-screen {
@@ -1145,108 +1383,130 @@
         
         .noclose-btn:hover { opacity: 0.9; }
         
-        /* ========== CALL TYPE SELECTOR ========== */
-        .call-type-selector {
-            width: 100%;
-            max-width: 280px;
-            margin-bottom: 24px;
-        }
-
-        .call-type-label {
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-        }
-
-        .call-type-buttons {
+        /* ========== ERROR MODAL ========== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
             display: flex;
-            background: var(--surface);
-            border-radius: 12px;
-            padding: 4px;
-            gap: 4px;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            padding: 20px;
+            padding-top: max(20px, env(safe-area-inset-top));
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
         }
-
-        .call-type-btn {
+        
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: var(--bg);
+            border-radius: 16px;
+            padding: 24px;
+            width: 100%;
+            max-width: 340px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+            transform: scale(0.95);
+            transition: transform 0.2s ease;
+        }
+        
+        .modal-overlay.visible .modal {
+            transform: scale(1);
+        }
+        
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+        
+        .modal-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--danger-soft);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .modal-icon svg {
+            width: 18px;
+            height: 18px;
+            color: var(--danger);
+        }
+        
+        .modal-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .modal-desc {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .modal-btn {
             flex: 1;
-            padding: 12px 8px;
-            background: transparent;
-            border: none;
+            padding: 12px 16px;
             border-radius: 10px;
             font-family: 'Inter', sans-serif;
-            font-size: 0.85rem;
+            font-size: 0.875rem;
             font-weight: 500;
-            color: var(--text-secondary);
             cursor: pointer;
             transition: all 0.15s ease;
         }
-
-        .call-type-btn.active {
-            background: var(--bg);
+        
+        .modal-btn-cancel {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        
+        .modal-btn-cancel:hover {
+            background: var(--surface);
             color: var(--text);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
-
-        .call-type-btn:hover:not(.active) { color: var(--text); }
-
-        .call-type-hint {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-top: 8px;
-            text-align: center;
+        
+        .modal-btn-confirm {
+            background: var(--text);
+            border: none;
+            color: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
         }
-
-        /* ========== PRICE OBJECTION BUTTON ========== */
-        /* Down-Close Level Indicator */
-        .down-close-indicator {
-            display: none;
-            background: linear-gradient(135deg, #1e3a5f 0%, #0f1f33 100%);
-            border-radius: 12px;
-            padding: 12px 16px;
-            margin: 0 16px 8px 16px;
-            flex-shrink: 0;
+        
+        .modal-btn-confirm:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
         }
-        .down-close-indicator.active { display: block; }
-        .down-close-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 6px;
+        
+        .modal-btn-confirm:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
         }
-        .down-close-badge {
-            background: rgba(96, 165, 250, 0.2);
-            color: #60A5FA;
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 6px;
-        }
-        .down-close-badge.floor {
-            background: rgba(239, 68, 68, 0.2);
-            color: #EF4444;
-        }
-        .down-close-title {
-            color: #FFFFFF;
-            font-size: 0.875rem;
-            font-weight: 600;
-        }
-        .down-close-message {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.8rem;
-            line-height: 1.4;
-        }
-        .down-close-message.floor-message {
-            color: #FCD34D;
-            font-weight: 500;
-        }
-
+        
         /* ========== RESPONSIVE ========== */
         @media (min-width: 768px) {
             .header { padding: 20px 32px; }
             .teleprompter { padding: 40px; }
-            .review-screen, .outcome-screen, .noclose-screen, .identify-screen {
+            .review-screen, .outcome-screen, .noclose-screen, .identify-screen, .start-screen, .connecting-screen {
                 max-width: 500px;
                 margin: 0 auto;
             }
@@ -1338,7 +1598,7 @@
                         </svg>
                     </div>
                     <h1 class="identify-title">Agent Setup</h1>
-                    <p class="identify-subtitle">One-time setup to get you started</p>
+                    <p class="identify-subtitle">One-time setup to get started</p>
                 </div>
                 
                 <div class="form-group">
@@ -1347,19 +1607,18 @@
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">Agency</label>
-                    <select class="form-select" id="agencySelect">
-                        <option value="">Select your agency...</option>
-                        <!-- Populated dynamically -->
-                    </select>
+                    <label class="form-label">Your Phone Number</label>
+                    <input type="tel" class="form-input" id="agentPhone" placeholder="(404) 555-1234" autocomplete="tel">
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">Agent ID <span class="form-optional">(optional)</span></label>
-                    <input type="text" class="form-input" id="agentId" placeholder="e.g. AGT-001">
+                    <label class="form-label">Agency</label>
+                    <select class="form-select" id="agencySelect">
+                        <option value="">Select your agency...</option>
+                    </select>
                 </div>
                 
-                <div class="form-error" id="identifyError">Please enter your name and select an agency</div>
+                <div class="form-error" id="identifyError">Please fill in all required fields</div>
                 
                 <button class="identify-btn" onclick="Coachd.saveIdentity()">Continue</button>
             </div>
@@ -1368,14 +1627,30 @@
         <!-- Start Screen -->
         <div class="screen start-screen" id="startScreen">
             <div class="start-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                    <line x1="12" x2="12" y1="19" y2="22"/>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                 </svg>
             </div>
-            <h1 class="start-title">Live Call</h1>
-            <p class="start-subtitle">Real-time coaching to help you close</p>
+            <h1 class="start-title">Ready to Coach</h1>
+            <p class="start-subtitle">Enter client's number below, or leave blank for 3-way calling.</p>
+            
+            <div class="start-phone-display" id="phoneDisplay">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+                <span id="phoneDisplayNumber">(404) 555-1234</span>
+            </div>
+            
+            <!-- Client Phone Input for Click-to-Call -->
+            <div class="client-phone-section">
+                <label class="form-label">CLIENT PHONE NUMBER</label>
+                <input type="tel" 
+                       id="clientPhoneInput" 
+                       class="form-input"
+                       placeholder="(555) 123-4567"
+                       autocomplete="tel">
+                <div class="client-phone-hint">We'll dial your client after you answer</div>
+            </div>
             
             <!-- Call Type Selector -->
             <div class="call-type-selector">
@@ -1388,14 +1663,24 @@
             </div>
             
             <button class="start-btn" id="startBtn" onclick="Coachd.startCall()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                 </svg>
-                Start Listening
+                Start Coaching
             </button>
-            <div class="test-badge">Test Mode — Uses Device Mic</div>
-            <button class="change-agent" onclick="Coachd.changeAgent()">Not you? Change agent</button>
+            <button class="change-agent" onclick="Coachd.changeAgent()">Not you? Change settings</button>
+        </div>
+        
+        <!-- Connecting Screen -->
+        <div class="screen connecting-screen" id="connectingScreen">
+            <div class="connecting-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+            </div>
+            <h1 class="connecting-title">Calling Your Phone...</h1>
+            <p class="connecting-subtitle">Answer the call to connect with Coachd</p>
+            <button class="connecting-cancel" onclick="Coachd.cancelCall()">Cancel</button>
         </div>
         
         <!-- Call Screen -->
@@ -1410,6 +1695,7 @@
                         <div class="bar"></div>
                     </div>
                     <div class="listening-text">Listening...</div>
+                    <div class="listening-hint">3-way in your client now</div>
                 </div>
                 
                 <div class="guidance-state" id="guidanceState">
@@ -1439,7 +1725,7 @@
                         <span class="caption-text waiting" id="agentCaptionText">Waiting for speech...</span>
                     </div>
                     <div class="caption-line" id="callerCaptionLine">
-                        <span class="caption-speaker caller">Caller</span>
+                        <span class="caption-speaker caller">Client</span>
                         <span class="caption-text waiting" id="callerCaptionText">Waiting for speech...</span>
                     </div>
                 </div>
@@ -1451,7 +1737,7 @@
                         <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/>
                         <line x1="23" y1="1" x2="1" y2="23"/>
                     </svg>
-                    End Call
+                    End Session
                 </button>
             </div>
         </div>
@@ -1478,7 +1764,7 @@
             </div>
         </div>
         
-        <!-- Review Screen -->
+        <!-- Review Screen (after closing) -->
         <div class="screen review-screen" id="reviewScreen">
             <div class="review-header">
                 <div class="review-icon">
@@ -1487,8 +1773,8 @@
                         <polyline points="22 4 12 14.01 9 11.01"/>
                     </svg>
                 </div>
-                <h1 class="review-title">Nice Work!</h1>
-                <p class="review-subtitle">Another one closed</p>
+                <h1 class="review-title">Great work! 🎉</h1>
+                <p class="review-subtitle">Quick review to improve coaching</p>
             </div>
             
             <div class="review-stats">
@@ -1498,18 +1784,18 @@
                 </div>
                 <div class="stat">
                     <div class="stat-value" id="statTips">0</div>
-                    <div class="stat-label">Tips Used</div>
+                    <div class="stat-label">Tips</div>
                 </div>
             </div>
             
-            <div class="review-section-title">Which tip helped most?</div>
-            <div class="review-helper">Select the tip that sealed the deal</div>
+            <p class="review-section-title">Which tip helped most?</p>
+            <p class="review-helper">Tap to select (optional)</p>
             
             <div id="reviewCards"></div>
             
             <div class="review-actions">
                 <button class="review-btn secondary" onclick="Coachd.goHome()">Done</button>
-                <button class="review-btn primary" onclick="Coachd.submitAndNewCall()">New Call</button>
+                <button class="review-btn primary" onclick="Coachd.submitAndNewCall()">Next Call</button>
             </div>
         </div>
         
@@ -1517,31 +1803,50 @@
         <div class="screen noclose-screen" id="nocloseScreen">
             <div class="noclose-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M16 16s-1.5-2-4-2-4 2-4 2"/>
-                    <line x1="9" y1="9" x2="9.01" y2="9"/>
-                    <line x1="15" y1="9" x2="15.01" y2="9"/>
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
                 </svg>
             </div>
-            <h1 class="noclose-title">Next time!</h1>
-            <p class="noclose-subtitle">What was the final objection you couldn't overcome?</p>
+            <h1 class="noclose-title">What stopped the sale?</h1>
+            <p class="noclose-subtitle">Help us coach you better next time</p>
             
-            <div class="noclose-label">Final Objection</div>
+            <label class="noclose-label">Final Objection</label>
             <select class="objection-select" id="finalObjection">
-                <option value="">Select the objection...</option>
-                <option value="price">Price too high</option>
+                <option value="">Select objection...</option>
+                <option value="price">Price / Can't afford it</option>
                 <option value="spouse">Need to talk to spouse</option>
                 <option value="think">Need to think about it</option>
-                <option value="timing">Not the right time</option>
-                <option value="existing">Already have coverage</option>
-                <option value="trust">Didn't trust/believe</option>
-                <option value="hangup">Hung up/disconnected</option>
+                <option value="coverage">Already has coverage</option>
+                <option value="not_interested">Not interested</option>
+                <option value="callback">Requested callback</option>
+                <option value="no_answer">No answer / Voicemail</option>
                 <option value="other">Other</option>
             </select>
             
             <div class="noclose-actions">
                 <button class="noclose-btn primary" onclick="Coachd.submitAndNewCall()">Next Call</button>
-                <button class="noclose-btn secondary" onclick="Coachd.goHome()">I'm Done</button>
+                <button class="noclose-btn secondary" onclick="Coachd.goHome()">Done for Now</button>
+            </div>
+        </div>
+        
+        <!-- Error Modal -->
+        <div class="modal-overlay" id="errorModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <div class="modal-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="8" x2="12" y2="12"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                    </div>
+                    <h3 class="modal-title" id="errorModalTitle">Connection Failed</h3>
+                </div>
+                <p class="modal-desc" id="errorModalMessage">Unable to start the call. Please try again.</p>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-cancel" onclick="Coachd.closeErrorModal()">Cancel</button>
+                    <button class="modal-btn modal-btn-confirm" onclick="Coachd.closeErrorModal()">Try Again</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1552,108 +1857,98 @@
     </div>
     
     <script>
-    /**
-     * Coachd.ai - Live Call Module
-     * Modular design for reuse in Twilio version
-     */
     const Coachd = (function() {
+        'use strict';
+        
         // ==================== CONFIG ====================
         const CONFIG = {
-            wsEndpoint: '/ws/',
-            outcomeEndpoint: '/api/call/outcome',
+            telnyxStartEndpoint: '/api/telnyx/start-call',
+            telnyxEndEndpoint: '/api/telnyx/end-call',
+            telnyxSessionEndpoint: '/api/telnyx/session',
             agenciesEndpoint: '/api/agencies',
-            streamSpeed: 18,  // DEPRECATED: No longer used for guidance (now instant fade-in)
-            audioNotifyFreq: 880,
-            audioNotifyDuration: 0.15,
-            captionFadeDelay: 4000 // Fade caption after 4s of silence
+            outcomeEndpoint: '/api/call-outcomes',
+            captionFadeDelay: 4000,
+            pollInterval: 2000
         };
         
         // ==================== STATE ====================
         const state = {
-            clientId: 'browser_' + Math.random().toString(36).substring(2, 11),
-            ws: null,
-            audioCtx: null,
-            mediaStream: null,
-            processor: null,
-            audioNotify: null,
-            audioKeepAlive: null,
-            isListening: false,
-            timerInterval: null,
-            streamInterval: null,
-            seconds: 0,
-            guidanceHistory: [],
-            selectedTipIndex: null,
-            callOutcome: null,
-            streamingGuidance: '',  // Accumulates text during streaming guidance
-            guidanceRenderPending: false,  // Throttle flag for smooth DOM updates
-            hasVibratedForCurrentGuidance: false,  // Prevent double notification
-            // Agent identity
+            sessionId: null,
             agentName: null,
-            agentId: null,
+            agentPhone: null,
+            clientPhone: null,  // Client phone for click-to-call
             agency: null,
             // SECURITY: Validated agency from home page
             validatedAgencyCode: null,
             validatedAgencyName: null,
-            // Client context (from Quick Prep + extracted from call)
-            clientContext: {
-                age: null,
-                sex: 'M',
-                married: 'N',
-                kids: 'N',
-                kidsCount: 0,
-                occupation: null,
-                income: null,
-                budget: null,  // Monthly budget for insurance (extracted from "I can only do $50")
-                weight: null,
-                tobacco: 'N',
-                product: 'whole_life',
-                issue: ''
-            },
-            // Caption fade timers
+            callType: 'phone',
+            isInCall: false,
+            seconds: 0,
+            timerInterval: null,
+            guidanceHistory: [],
+            selectedTipIndex: null,
+            callOutcome: null,
+            downCloseLevel: 0,
+            ws: null,
             agentFadeTimer: null,
             callerFadeTimer: null,
-            // Call type and down-close tracking
-            callType: 'phone',
-            downCloseLevel: 0
+            streamingGuidance: '',
+            hasVibratedForCurrentGuidance: false,
+            clientContext: {
+                product: 'whole_life',
+                age: null,
+                occupation: null,
+                married: null,
+                kids: null,
+                kidsCount: null,
+                tobacco: null,
+                budget: null
+            }
         };
         
         // ==================== DOM ====================
         const dom = {
-            get timer() { return document.getElementById('timer'); },
-            get statusIndicator() { return document.getElementById('statusIndicator'); },
             get identifyScreen() { return document.getElementById('identifyScreen'); },
             get startScreen() { return document.getElementById('startScreen'); },
+            get connectingScreen() { return document.getElementById('connectingScreen'); },
             get callScreen() { return document.getElementById('callScreen'); },
             get outcomeScreen() { return document.getElementById('outcomeScreen'); },
             get reviewScreen() { return document.getElementById('reviewScreen'); },
             get nocloseScreen() { return document.getElementById('nocloseScreen'); },
+            get startBtn() { return document.getElementById('startBtn'); },
+            get timer() { return document.getElementById('timer'); },
+            get statusIndicator() { return document.getElementById('statusIndicator'); },
             get teleprompter() { return document.getElementById('teleprompter'); },
             get listeningState() { return document.getElementById('listeningState'); },
             get guidanceState() { return document.getElementById('guidanceState'); },
             get guidanceText() { return document.getElementById('guidanceText'); },
-            get reviewCards() { return document.getElementById('reviewCards'); },
             get statDuration() { return document.getElementById('statDuration'); },
             get statTips() { return document.getElementById('statTips'); },
+            get reviewCards() { return document.getElementById('reviewCards'); },
             get finalObjection() { return document.getElementById('finalObjection'); },
-            get startBtn() { return document.getElementById('startBtn'); },
             get agentName() { return document.getElementById('agentName'); },
-            get agentId() { return document.getElementById('agentId'); },
+            get agentPhone() { return document.getElementById('agentPhone'); },
             get agencySelect() { return document.getElementById('agencySelect'); },
             get identifyError() { return document.getElementById('identifyError'); },
             get agentBadge() { return document.getElementById('agentBadge'); },
             get agentBadgeName() { return document.getElementById('agentBadgeName'); },
-            // Caption elements
+            get phoneDisplay() { return document.getElementById('phoneDisplay'); },
+            get phoneDisplayNumber() { return document.getElementById('phoneDisplayNumber'); },
+            get clientPhoneInput() { return document.getElementById('clientPhoneInput'); },
             get captionsDot() { return document.getElementById('captionsDot'); },
             get agentCaptionLine() { return document.getElementById('agentCaptionLine'); },
             get callerCaptionLine() { return document.getElementById('callerCaptionLine'); },
             get agentCaptionText() { return document.getElementById('agentCaptionText'); },
             get callerCaptionText() { return document.getElementById('callerCaptionText'); },
             get callTypeHint() { return document.getElementById('callTypeHint'); },
-            // V5: Down-close indicator
+            // Down-close indicator
             get downCloseIndicator() { return document.getElementById('downCloseIndicator'); },
             get downCloseBadge() { return document.getElementById('downCloseBadge'); },
             get downCloseTitle() { return document.getElementById('downCloseTitle'); },
-            get downCloseMessage() { return document.getElementById('downCloseMessage'); }
+            get downCloseMessage() { return document.getElementById('downCloseMessage'); },
+            get errorModal() { return document.getElementById('errorModal'); },
+            get errorModalTitle() { return document.getElementById('errorModalTitle'); },
+            get errorModalMessage() { return document.getElementById('errorModalMessage'); }
         };
         
         // ==================== INIT ====================
@@ -1690,7 +1985,7 @@
         }
         
         async function init() {
-            console.log('🚀 Coachd.ai Live Call - VERSION: 2025-12-22-v4-secure-agency-gate');
+            console.log('🚀 Coachd.ai Live Call (Telnyx) - VERSION: 2025-12-22-telnyx-v2-secure');
             
             // SECURITY: Gate on validated agency code FIRST
             const validatedAgency = checkAgencyCode();
@@ -1712,7 +2007,6 @@
             if (saved) {
                 try {
                     const ctx = JSON.parse(saved);
-                    // Merge with defaults
                     Object.keys(ctx).forEach(key => {
                         if (ctx[key] !== null && ctx[key] !== undefined) {
                             state.clientContext[key] = ctx[key];
@@ -1739,7 +2033,7 @@
                     });
                 }
             } catch (e) {
-                // Fallback agencies if endpoint doesn't exist yet
+                // Fallback agencies
                 const fallback = [
                     { code: 'ADERHOLT', name: 'Aderholt Agency' },
                     { code: 'BROOKS', name: 'Brooks Agency' }
@@ -1762,7 +2056,6 @@
                     // SECURITY: Only accept saved identity if it matches validated agency
                     if (data.agency !== state.validatedAgencyCode) {
                         console.log('[Security] Saved agent agency mismatch - showing identify screen');
-                        // Clear mismatched identity
                         localStorage.removeItem('coachd_agent');
                         prefillAgencyDropdown();
                         showScreen('identifyScreen');
@@ -1770,9 +2063,10 @@
                     }
                     
                     state.agentName = data.name;
-                    state.agentId = data.agentId;
+                    state.agentPhone = data.phone;
                     state.agency = data.agency;
                     showAgentBadge();
+                    updatePhoneDisplay();
                     showScreen('startScreen');
                 } catch (e) {
                     prefillAgencyDropdown();
@@ -1795,13 +2089,30 @@
             }
         }
         
+        function formatPhoneDisplay(phone) {
+            const digits = phone.replace(/\D/g, '').slice(-10);
+            if (digits.length === 10) {
+                return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+            }
+            return phone;
+        }
+        
+        function updatePhoneDisplay() {
+            if (state.agentPhone) {
+                dom.phoneDisplayNumber.textContent = formatPhoneDisplay(state.agentPhone);
+            }
+        }
+        
         function saveIdentity() {
             const name = dom.agentName.value.trim();
+            const phone = dom.agentPhone.value.trim();
             // SECURITY: Use validated agency code, not dropdown value
             const agency = state.validatedAgencyCode;
-            const agentId = dom.agentId.value.trim();
             
-            if (!name || !agency) {
+            // Validate phone number (at least 10 digits)
+            const phoneDigits = phone.replace(/\D/g, '');
+            if (!name || !agency || phoneDigits.length < 10) {
+                dom.identifyError.textContent = 'Please enter your name and phone number';
                 dom.identifyError.classList.add('show');
                 return;
             }
@@ -1809,16 +2120,17 @@
             dom.identifyError.classList.remove('show');
             
             state.agentName = name;
+            state.agentPhone = phone;
             state.agency = agency;
-            state.agentId = agentId || null;
             
             localStorage.setItem('coachd_agent', JSON.stringify({
                 name: state.agentName,
-                agency: state.agency,
-                agentId: state.agentId
+                phone: state.agentPhone,
+                agency: state.agency
             }));
             
             showAgentBadge();
+            updatePhoneDisplay();
             showScreen('startScreen');
         }
         
@@ -1831,11 +2143,11 @@
         function changeAgent() {
             localStorage.removeItem('coachd_agent');
             state.agentName = null;
-            state.agentId = null;
+            state.agentPhone = null;
             state.agency = null;
             dom.agentBadge.classList.remove('show');
             dom.agentName.value = '';
-            dom.agentId.value = '';
+            dom.agentPhone.value = '';
             // Agency stays locked to validated agency
             prefillAgencyDropdown();
             showScreen('identifyScreen');
@@ -1854,12 +2166,7 @@
             dom.callTypeHint.textContent = hints[type];
         }
         
-        // ==================== PRICE OBJECTION / DOWN-CLOSE ====================
-        // Down-close scripts from Globe Life training
-        // Down-close levels tracked for backend sync
-        const MAX_DOWN_CLOSE_LEVELS = 5;
-        
-        // V5: Handle down-close level indicator from backend
+        // ==================== DOWN-CLOSE INDICATOR ====================
         function handleDownCloseLevel(msg) {
             const level = msg.level || 0;
             const remaining = msg.remaining || (5 - level);
@@ -1899,7 +2206,6 @@
             }
         }
         
-        // V5: Hide down-close indicator
         function hideDownCloseIndicator() {
             dom.downCloseIndicator.classList.remove('active');
             dom.downCloseBadge.classList.remove('floor');
@@ -1924,6 +2230,9 @@
                 </svg>`,
                 connecting: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                     <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                </svg>`,
+                ringing: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                 </svg>`,
                 error: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                     <circle cx="12" cy="12" r="10"/>
@@ -1958,172 +2267,112 @@
             }
         }
         
-        // ==================== AUDIO ====================
-        let audioChunkCount = 0; // Debug counter
+        // ==================== ERROR MODAL ====================
+        function showErrorModal(title, message) {
+            dom.errorModalTitle.textContent = title || 'Connection Failed';
+            dom.errorModalMessage.textContent = message || 'Unable to start the call. Please try again.';
+            dom.errorModal.classList.add('visible');
+        }
         
-        async function setupAudio() {
+        function closeErrorModal() {
+            dom.errorModal.classList.remove('visible');
+        }
+        
+        // ==================== TELNYX CALL FLOW ====================
+        async function startCall() {
+            dom.startBtn.disabled = true;
+            
+            // Get client phone if provided (click-to-call mode)
+            const clientPhone = dom.clientPhoneInput?.value?.trim() || '';
+            state.clientPhone = clientPhone;
+            
+            setStatus('connecting');
+            showScreen('connectingScreen');
+            
+            // Update connecting screen message based on mode
+            const connectingTitle = document.querySelector('.connecting-title');
+            const connectingSubtitle = document.querySelector('.connecting-subtitle');
+            if (clientPhone) {
+                if (connectingTitle) connectingTitle.textContent = 'Calling Your Phone...';
+                if (connectingSubtitle) connectingSubtitle.textContent = 'Answer, then we\'ll dial your client';
+            } else {
+                if (connectingTitle) connectingTitle.textContent = 'Calling Your Phone...';
+                if (connectingSubtitle) connectingSubtitle.textContent = 'Answer and 3-way in your client';
+            }
+            
             try {
-                // Create AudioContext - let browser choose sample rate, we'll resample
-                state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                
-                // Resume AudioContext (required for Safari and Chrome autoplay policy)
-                if (state.audioCtx.state === 'suspended') {
-                    await state.audioCtx.resume();
-                }
-                console.log('[Audio] AudioContext state:', state.audioCtx.state, 'sampleRate:', state.audioCtx.sampleRate);
-                
-                // Get microphone
-                state.mediaStream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true
-                    }, 
-                    video: false 
+                // Call the Telnyx API - include client_phone for click-to-call
+                const response = await fetch(CONFIG.telnyxStartEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agent_phone: state.agentPhone,
+                        client_phone: clientPhone || null  // null triggers legacy 3-way mode
+                    })
                 });
-                console.log('[Audio] Got microphone stream');
                 
-                // Create audio source from mic
-                const source = state.audioCtx.createMediaStreamSource(state.mediaStream);
+                const data = await response.json();
                 
-                // Create processor with larger buffer for stability
-                state.processor = state.audioCtx.createScriptProcessor(4096, 1, 1);
+                if (!response.ok || !data.success) {
+                    throw new Error(data.detail || data.error || 'Failed to start call');
+                }
                 
-                // Calculate resampling ratio (browser sample rate -> 16kHz for Deepgram)
-                const inputSampleRate = state.audioCtx.sampleRate;
-                const outputSampleRate = 16000;
-                const resampleRatio = inputSampleRate / outputSampleRate;
+                state.sessionId = data.session_id;
+                console.log('[Telnyx] Call initiated, session:', state.sessionId);
                 
-                console.log('[Audio] Resampling from', inputSampleRate, 'to', outputSampleRate);
+                setStatus('ringing');
                 
-                // Process audio and send to WebSocket
-                state.processor.onaudioprocess = (e) => {
-                    if (!state.isListening || !state.ws || state.ws.readyState !== WebSocket.OPEN) {
-                        return;
-                    }
-                    
-                    // Get Float32 audio data
-                    const inputData = e.inputBuffer.getChannelData(0);
-                    
-                    // Resample to 16kHz
-                    const outputLength = Math.floor(inputData.length / resampleRatio);
-                    const int16Data = new Int16Array(outputLength);
-                    
-                    for (let i = 0; i < outputLength; i++) {
-                        // Simple linear resampling
-                        const srcIndex = i * resampleRatio;
-                        const srcIndexFloor = Math.floor(srcIndex);
-                        const srcIndexCeil = Math.min(srcIndexFloor + 1, inputData.length - 1);
-                        const t = srcIndex - srcIndexFloor;
-                        
-                        // Interpolate between samples
-                        const sample = inputData[srcIndexFloor] * (1 - t) + inputData[srcIndexCeil] * t;
-                        
-                        // Clamp and convert to Int16
-                        const s = Math.max(-1, Math.min(1, sample));
-                        int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                    }
-                    
-                    // Send as binary to WebSocket
-                    state.ws.send(int16Data.buffer);
-                    
-                    // Debug logging (every 50 chunks = ~12 seconds)
-                    audioChunkCount++;
-                    if (audioChunkCount % 50 === 0) {
-                        console.log('[Audio] Sent', audioChunkCount, 'chunks, WS state:', state.ws.readyState);
-                    }
-                };
-                
-                // Connect: mic -> processor -> silent output (to keep processor alive)
-                source.connect(state.processor);
-                
-                // Create a silent gain node instead of connecting to speakers
-                const silentGain = state.audioCtx.createGain();
-                silentGain.gain.value = 0; // Silent
-                state.processor.connect(silentGain);
-                silentGain.connect(state.audioCtx.destination);
-                
-                // Keep AudioContext alive with periodic check
-                state.audioKeepAlive = setInterval(() => {
-                    if (state.audioCtx && state.audioCtx.state === 'suspended') {
-                        console.log('[Audio] Resuming suspended AudioContext');
-                        state.audioCtx.resume();
-                    }
-                }, 1000);
-                
-                console.log('[Audio] Setup complete - streaming to WebSocket');
-                audioChunkCount = 0;
-                return true;
+                // Connect WebSocket for real-time updates
+                await connectWebSocket();
                 
             } catch (e) {
-                console.error('Audio setup failed:', e);
-                return false;
-            }
-        }
-        
-        function stopAudio() {
-            // Clear keepalive interval
-            if (state.audioKeepAlive) {
-                clearInterval(state.audioKeepAlive);
-                state.audioKeepAlive = null;
+                console.error('Start call failed:', e);
+                setStatus('error');
+                showScreen('startScreen');
+                showErrorModal('Connection Failed', e.message || 'Unable to start the call. Please try again.');
             }
             
-            console.log('[Audio] Stopping. Total chunks sent:', audioChunkCount);
-            
-            if (state.processor) {
-                state.processor.disconnect();
-                state.processor = null;
-            }
-            if (state.mediaStream) {
-                state.mediaStream.getTracks().forEach(t => t.stop());
-                state.mediaStream = null;
-            }
-            if (state.audioCtx) {
-                state.audioCtx.close();
-                state.audioCtx = null;
-            }
+            dom.startBtn.disabled = false;
         }
         
-        function initAudioNotify() {
-            if (state.audioNotify) return;
-            state.audioNotify = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        
-        function playNotify() {
-            if (!state.audioNotify) return;
-            const osc = state.audioNotify.createOscillator();
-            const gain = state.audioNotify.createGain();
-            osc.connect(gain);
-            gain.connect(state.audioNotify.destination);
-            osc.frequency.value = CONFIG.audioNotifyFreq;
-            osc.type = 'sine';
-            gain.gain.setValueAtTime(0.3, state.audioNotify.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, state.audioNotify.currentTime + CONFIG.audioNotifyDuration);
-            osc.start();
-            osc.stop(state.audioNotify.currentTime + CONFIG.audioNotifyDuration);
-        }
-        
-        // ==================== WEBSOCKET ====================
-        async function connect() {
+        async function connectWebSocket() {
             return new Promise((resolve, reject) => {
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const url = `${protocol}//${window.location.host}${CONFIG.wsEndpoint}${state.clientId}?agency=${state.agency || 'default'}`;
+                const wsUrl = `${protocol}//${window.location.host}/ws/telnyx/session/${state.sessionId}`;
                 
-                state.ws = new WebSocket(url);
+                console.log('[WS] Connecting to:', wsUrl);
+                state.ws = new WebSocket(wsUrl);
                 
                 state.ws.onopen = () => {
-                    // Send initial context from Quick Prep
-                    sendContextUpdate();
+                    console.log('[WS] Connected');
                     resolve();
                 };
-                state.ws.onerror = (e) => reject(e);
-                state.ws.onclose = () => {
-                    if (state.isListening) endCall();
+                
+                state.ws.onclose = (event) => {
+                    console.log('[WS] Disconnected, code:', event.code, 'reason:', event.reason);
+                    
+                    // If we're on the connecting screen, call was rejected/ended before answering
+                    if (dom.connectingScreen.classList.contains('active')) {
+                        console.log('[WS] Call ended while connecting');
+                        state.sessionId = null;
+                        setStatus('');
+                        showScreen('startScreen');
+                    }
+                    // If we're in an active call, show outcome screen
+                    else if (state.isInCall) {
+                        console.log('[WS] Call ended during active session');
+                        endCall();
+                    }
+                };
+                
+                state.ws.onerror = (err) => {
+                    console.error('[WS] Error:', err);
+                    reject(err);
                 };
                 
                 state.ws.onmessage = (e) => {
                     try {
                         const msg = JSON.parse(e.data);
-                        console.log('[WS] Received:', msg.type, msg);
                         handleMessage(msg);
                     } catch (err) {
                         console.error('[WS] Parse error:', err);
@@ -2131,75 +2380,204 @@
                 };
                 
                 setTimeout(() => {
-                    if (state.ws.readyState !== WebSocket.OPEN) reject(new Error('Timeout'));
+                    if (state.ws.readyState !== WebSocket.OPEN) {
+                        reject(new Error('WebSocket timeout'));
+                    }
                 }, 10000);
             });
         }
         
         function handleMessage(msg) {
-            console.log('[MSG] Processing:', msg.type);
+            console.log('[MSG]', msg.type);
+            
             switch (msg.type) {
+                case 'session_state':
+                    handleSessionState(msg.data);
+                    break;
+                case 'status_update':
+                    handleStatusUpdate(msg.data);
+                    break;
+                case 'session_update':
+                    // Backend sends this on session changes
+                    handleStatusUpdate(msg.data);
+                    break;
                 case 'ready':
-                    setStatus('listening');
+                    // Agent connected, call is live
+                    onCallConnected();
                     break;
                 case 'transcript':
                     handleTranscript(msg);
                     break;
-                // Legacy non-streaming guidance
+                case 'speakers_identified':
+                    // Agent intro detected - roles are now locked
+                    console.log('✅ Speakers identified:', msg.message);
+                    setStatus('Coaching active');
+                    break;
+                case 'client_dialing':
+                    // Click-to-call: Dialing client now
+                    console.log('📞 Dialing client...');
+                    const dialingTitle = document.querySelector('.connecting-title');
+                    if (dialingTitle) dialingTitle.textContent = 'Dialing Client...';
+                    const dialingSubtitle = document.querySelector('.connecting-subtitle');
+                    if (dialingSubtitle) dialingSubtitle.textContent = 'Connecting you now';
+                    break;
+                case 'client_connected':
+                    // Click-to-call: Client answered
+                    console.log('✅ Client connected!');
+                    onCallConnected();
+                    break;
                 case 'guidance':
-                    console.log('[MSG] Legacy guidance received');
                     handleGuidance(msg);
                     break;
-                // Streaming guidance - first chunk
                 case 'guidance_start':
-                    console.log('[MSG] guidance_start received, chunk length:', (msg.chunk || '').length, 'full_text length:', (msg.full_text || '').length);
                     handleGuidanceStart(msg);
                     break;
-                // Streaming guidance - subsequent chunks
                 case 'guidance_chunk':
-                    console.log('[MSG] guidance_chunk received');
                     handleGuidanceChunk(msg);
                     break;
-                // Streaming guidance - complete
                 case 'guidance_complete':
-                    console.log('[MSG] guidance_complete received, guidance length:', (msg.guidance || '').length);
                     handleGuidanceComplete(msg);
                     break;
-                // V5: Down-close level update
                 case 'down_close_level':
                     handleDownCloseLevel(msg);
                     break;
                 case 'bridge':
                     handleBridge(msg);
                     break;
+                case 'call_ended':
+                    endCall();
+                    break;
                 case 'error':
                     console.error('Server error:', msg.message);
                     break;
-                default:
-                    console.log('[MSG] Unknown message type:', msg.type);
             }
         }
         
+        function handleSessionState(data) {
+            console.log('[Session State]', data.status);
+            
+            if (data.status === 'agent_connected' || data.status === 'in_progress') {
+                onCallConnected();
+            } else if (data.status === 'ended' || data.status === 'failed') {
+                endCall();
+            }
+        }
+        
+        function handleStatusUpdate(data) {
+            console.log('[Status Update]', data.status);
+            
+            if (data.status === 'agent_connected' || data.status === 'in_progress') {
+                onCallConnected();
+            }
+        }
+        
+        function onCallConnected() {
+            if (state.isInCall) return; // Already handled
+            
+            state.isInCall = true;
+            state.guidanceHistory = [];
+            state.selectedTipIndex = null;
+            state.callOutcome = null;
+            state.downCloseLevel = 0;
+            
+            resetCaptions();
+            showScreen('callScreen');
+            startTimer();
+            setStatus('listening');
+            
+            // Keep screen awake
+            if ('wakeLock' in navigator) {
+                navigator.wakeLock.request('screen').catch(() => {});
+            }
+            
+            console.log('[Call] Connected and listening');
+            
+            // Update hint based on call mode
+            const listeningHint = document.querySelector('.listening-hint');
+            if (listeningHint) {
+                if (state.clientPhone) {
+                    listeningHint.textContent = 'Connected — coaching active';
+                } else {
+                    listeningHint.textContent = '3-way in your client now';
+                }
+            }
+        }
+        
+        function cancelCall() {
+            console.log('[Cancel] Canceling call, session:', state.sessionId);
+            
+            // Close WebSocket first
+            if (state.ws) {
+                state.ws.close();
+                state.ws = null;
+            }
+            
+            // Tell backend to hang up the Telnyx call
+            if (state.sessionId) {
+                fetch(CONFIG.telnyxEndEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: state.sessionId })
+                }).then(resp => {
+                    console.log('[Cancel] End call response:', resp.status);
+                }).catch(err => {
+                    console.log('[Cancel] End call error:', err);
+                });
+            }
+            
+            state.sessionId = null;
+            state.isInCall = false;
+            setStatus('');
+            showScreen('startScreen');
+        }
+        
+        function endCall() {
+            state.isInCall = false;
+            
+            if (state.sessionId) {
+                fetch(CONFIG.telnyxEndEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: state.sessionId })
+                }).catch(() => {});
+            }
+            
+            if (state.ws) {
+                state.ws.close();
+                state.ws = null;
+            }
+            
+            stopTimer();
+            setStatus('');
+            showScreen('outcomeScreen');
+            state.sessionId = null;
+        }
+        
+        // ==================== TRANSCRIPTS ====================
         function handleTranscript(msg) {
             const text = msg.text || '';
             const isFinal = msg.is_final;
-            const speaker = msg.speaker || 'agent'; // Default to agent for browser mic test
+            let speaker = msg.speaker || 'agent';
+            const rolesLocked = msg.roles_locked;
             
-            // Update the appropriate caption line
+            // Before roles are locked, show everything as neutral "agent" line
+            // This prevents false CLIENT labels before we know who's who
+            if (!rolesLocked && speaker === 'unknown') {
+                speaker = 'agent';  // Show in agent line until we identify speakers
+            }
+            
             updateCaption(speaker, text, !isFinal);
             
-            // Extract client info from final caller transcripts
-            if (isFinal && speaker === 'caller' && text.length > 3) {
+            // Only extract client info from confirmed client speech
+            if (isFinal && speaker === 'caller' && text.length > 3 && rolesLocked) {
                 extractClientInfo(text);
             }
         }
         
-        // ==================== CLIENT INFO EXTRACTION ====================
         function extractClientInfo(text) {
-            const lower = text.toLowerCase();
             let updated = false;
             
-            // Age extraction - "I'm 44", "I am 52 years old", "I'm fifty-two"
+            // Age extraction
             const agePatterns = [
                 /i(?:'m| am)\s*(\d{1,2})(?:\s*years?\s*old)?/i,
                 /(?:^|\s)(\d{1,2})\s*years?\s*old/i,
@@ -2212,22 +2590,20 @@
                     if (age >= 18 && age <= 100 && age !== state.clientContext.age) {
                         state.clientContext.age = age;
                         updated = true;
-                        console.log('[Context] Extracted age:', age);
                     }
                     break;
                 }
             }
             
-            // Marital status - "my wife", "my husband", "I'm married", "I'm single"
+            // Marital status
             if (!state.clientContext.married || state.clientContext.married === 'N') {
                 if (/\b(my wife|my husband|my spouse|i'm married|i am married|we're married)\b/i.test(text)) {
                     state.clientContext.married = 'Y';
                     updated = true;
-                    console.log('[Context] Extracted married: Y');
                 }
             }
             
-            // Kids - "my kids", "my children", "I have 3 kids", "two children"
+            // Kids
             const kidsPatterns = [
                 /(?:have|got)\s*(\d+|one|two|three|four|five|six)\s*(?:kids?|children|child)/i,
                 /(\d+|one|two|three|four|five|six)\s*(?:kids?|children)/i,
@@ -2237,7 +2613,6 @@
                 const match = text.match(pattern);
                 if (match) {
                     state.clientContext.kids = 'Y';
-                    // Try to extract count
                     const numWords = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
                     const countMatch = match[1];
                     if (countMatch) {
@@ -2247,44 +2622,11 @@
                         }
                     }
                     updated = true;
-                    console.log('[Context] Extracted kids:', state.clientContext.kidsCount || 'Y');
                     break;
                 }
             }
             
-            // Occupation - "I work at", "I'm a", "I work as"
-            const jobPatterns = [
-                /i(?:'m| am)\s+(?:a|an)\s+([a-z]+(?:\s+[a-z]+)?)/i,
-                /i\s+work\s+(?:at|for|as)\s+(?:a\s+)?([a-z]+(?:\s+[a-z]+){0,2})/i,
-                /(?:job|work)\s+(?:is|as)\s+(?:a\s+)?([a-z]+(?:\s+[a-z]+)?)/i
-            ];
-            for (const pattern of jobPatterns) {
-                const match = text.match(pattern);
-                if (match && match[1]) {
-                    const occupation = match[1].trim();
-                    // Filter out non-occupation matches
-                    const skipWords = ['not', 'very', 'really', 'just', 'here', 'there', 'good', 'fine', 'okay', 'sure'];
-                    if (occupation.length > 2 && !skipWords.includes(occupation.toLowerCase())) {
-                        state.clientContext.occupation = occupation;
-                        updated = true;
-                        console.log('[Context] Extracted occupation:', occupation);
-                        break;
-                    }
-                }
-            }
-            
-            // Tobacco - "I smoke", "I don't smoke", "non-smoker"
-            if (/\b(i smoke|i do smoke|smoker|i use tobacco)\b/i.test(text)) {
-                state.clientContext.tobacco = 'Y';
-                updated = true;
-                console.log('[Context] Extracted tobacco: Y');
-            } else if (/\b(don't smoke|do not smoke|non-smoker|nonsmoker|no tobacco)\b/i.test(text)) {
-                state.clientContext.tobacco = 'N';
-                updated = true;
-                console.log('[Context] Extracted tobacco: N');
-            }
-            
-            // Budget extraction - "I can only do $50", "$75 a month", "maybe $60"
+            // Budget
             const budgetPatterns = [
                 /(?:only|maybe|about|around|do|afford|pay|spend)\s*\$(\d+)/i,
                 /\$(\d+)\s*(?:a|per)?\s*month/i,
@@ -2298,13 +2640,11 @@
                     if (budget >= 10 && budget <= 500 && budget !== state.clientContext.budget) {
                         state.clientContext.budget = budget;
                         updated = true;
-                        console.log('[Context] Extracted budget:', budget);
                     }
                     break;
                 }
             }
             
-            // Send context update to backend if anything changed
             if (updated) {
                 sendContextUpdate();
             }
@@ -2312,9 +2652,7 @@
         
         function sendContextUpdate() {
             if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-                // Format context for backend (matches websocket_handler.py expectations)
                 const contextData = {
-                    client_id: state.clientId,  // For browser test mode detection
                     call_type: state.callType,
                     agency: state.agency,
                     product: state.clientContext.product,
@@ -2328,7 +2666,6 @@
                     type: 'context',
                     data: contextData
                 }));
-                console.log('[Context] Sent update to backend:', contextData);
             }
         }
         
@@ -2355,19 +2692,14 @@
             const captionText = speaker === 'agent' ? dom.agentCaptionText : dom.callerCaptionText;
             const fadeTimerKey = speaker === 'agent' ? 'agentFadeTimer' : 'callerFadeTimer';
             
-            // Clear any existing fade timer
             if (state[fadeTimerKey]) {
                 clearTimeout(state[fadeTimerKey]);
                 state[fadeTimerKey] = null;
             }
             
-            // Remove faded state
             captionLine.classList.remove('faded');
-            
-            // Activate the indicator dot
             dom.captionsDot.classList.add('active');
             
-            // Update text
             captionText.classList.remove('waiting', 'interim');
             
             if (isInterim) {
@@ -2376,12 +2708,10 @@
             
             captionText.textContent = text || 'Waiting for speech...';
             
-            // Set fade timer for final transcripts
             if (!isInterim && text) {
                 state[fadeTimerKey] = setTimeout(() => {
                     captionLine.classList.add('faded');
                     
-                    // Check if both are faded, then dim the indicator
                     if (dom.agentCaptionLine.classList.contains('faded') && 
                         dom.callerCaptionLine.classList.contains('faded')) {
                         dom.captionsDot.classList.remove('active');
@@ -2391,13 +2721,11 @@
         }
         
         function resetCaptions() {
-            // Clear fade timers
             if (state.agentFadeTimer) clearTimeout(state.agentFadeTimer);
             if (state.callerFadeTimer) clearTimeout(state.callerFadeTimer);
             state.agentFadeTimer = null;
             state.callerFadeTimer = null;
             
-            // Reset caption UI
             dom.agentCaptionLine.classList.remove('faded');
             dom.callerCaptionLine.classList.remove('faded');
             dom.agentCaptionText.textContent = 'Waiting for speech...';
@@ -2419,8 +2747,10 @@
             dom.guidanceText.innerHTML = '<div class="guidance-loading">●  ●  ●</div>';
             dom.guidanceState.classList.add('active');
             
-            playNotify();
+            // Single vibrate for the objection
             if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+            
+            // Mark that we've already vibrated for this guidance
             state.hasVibratedForCurrentGuidance = true;
         }
         
@@ -2438,25 +2768,19 @@
             
             showGuidance(sayThis);
             
-            // Only notify if we haven't already (e.g., from bridge)
-            if (!state.hasVibratedForCurrentGuidance) {
-                playNotify();
-                if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+            // Only vibrate if we haven't already (e.g., from bridge)
+            if (!state.hasVibratedForCurrentGuidance && navigator.vibrate) {
+                navigator.vibrate([50, 30, 50]);
             }
             state.hasVibratedForCurrentGuidance = false;
         }
-        
-        // ==================== STREAMING GUIDANCE HANDLERS ====================
-        // These handle real-time token streaming for ~1 second first-visible latency
         
         function handleGuidanceStart(msg) {
             console.log('[GUIDANCE_START] ====================================');
             console.log('[GUIDANCE_START] Received guidance');
             
-            // Get the content to display
             const content = msg.full_text || msg.chunk || '';
             console.log('[GUIDANCE_START] Content length:', content.length);
-            console.log('[GUIDANCE_START] Preview:', content.substring(0, 80) + '...');
             
             if (!content) {
                 console.log('[GUIDANCE_START] No content, returning');
@@ -2465,46 +2789,25 @@
             }
             
             console.log('[GUIDANCE_START] ====================================');
-            displayGuidanceStart(msg);
-        }
-        
-        function displayGuidanceStart(msg) {
-            const content = msg.full_text || msg.chunk || '';
             
-            // Store streaming state
             state.streamingGuidance = content;
             
-            // Hide listening state and enable scrolling
             dom.listeningState.style.display = 'none';
             dom.teleprompter.classList.add('has-guidance');
-            console.log('[GUIDANCE_START] Hid listening state');
-            
-            // Set the text
             dom.guidanceText.innerHTML = formatGuidanceText(content);
-            console.log('[GUIDANCE_START] Set guidanceText innerHTML');
-            
-            // Show the guidance panel
             dom.guidanceState.classList.add('active');
-            console.log('[GUIDANCE_START] Added active class to guidanceState');
             
-            // Only notify if we haven't already (e.g., from bridge)
-            if (!state.hasVibratedForCurrentGuidance) {
-                playNotify();
-                if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+            // Only vibrate if we haven't already (e.g., from bridge)
+            if (!state.hasVibratedForCurrentGuidance && navigator.vibrate) {
+                navigator.vibrate([50, 30, 50]);
             }
-            console.log('[GUIDANCE_START] Played notification');
         }
         
         function handleGuidanceChunk(msg) {
-            // Get the accumulated content
             const content = msg.full_text || (state.streamingGuidance + (msg.chunk || ''));
-            
             if (!content) return;
             
-            // Update state
             state.streamingGuidance = content;
-            
-            // Update display
             dom.guidanceText.innerHTML = formatGuidanceText(content);
         }
         
@@ -2513,12 +2816,9 @@
             console.log('[GUIDANCE_COMPLETE] Guidance delivery complete');
             console.log('[GUIDANCE_COMPLETE] Objection type:', msg.objection_type || 'unknown');
             console.log('[GUIDANCE_COMPLETE] Down-close level:', msg.down_close_level || 0);
-            console.log('[GUIDANCE_COMPLETE] Instant:', msg.instant || false);
-            console.log('[GUIDANCE_COMPLETE] Fallback:', msg.fallback || false);
             
             const fullText = msg.guidance || state.streamingGuidance || '';
             console.log('[GUIDANCE_COMPLETE] Text length:', fullText.length);
-            console.log('[GUIDANCE_COMPLETE] Preview:', fullText.substring(0, 100) + '...');
             
             if (!fullText) {
                 console.log('[GUIDANCE_COMPLETE] ⚠️ WARNING: No text to display!');
@@ -2530,7 +2830,6 @@
             
             const sayThis = extractSayThis(fullText);
             
-            // Store in history
             state.guidanceHistory.push({
                 text: sayThis,
                 raw: fullText,
@@ -2539,26 +2838,20 @@
                 down_close_level: msg.down_close_level
             });
             
-            // Display the final text - prefer sayThis, fallback to full text
             const displayText = sayThis || fullText;
             dom.guidanceText.innerHTML = formatGuidanceText(displayText);
-            console.log('[GUIDANCE_COMPLETE] Displayed text length:', displayText.length);
             
-            // Ensure panel is visible
             dom.listeningState.style.display = 'none';
             dom.guidanceState.classList.add('active');
             
-            // Clear streaming state
             state.streamingGuidance = '';
         }
         
         function formatGuidanceText(text) {
             if (!text) return '';
             
-            // Bold numbers/money
             let formatted = text.replace(/(\$[\d,]+|\d+%|\d+,\d+)/g, '<strong>$1</strong>');
             
-            // Highlight quoted text as key phrase
             const quotedMatch = formatted.match(/"([^"]+)"/);
             if (quotedMatch) {
                 formatted = formatted.replace(
@@ -2571,18 +2864,12 @@
         }
         
         function extractSayThis(text) {
-            // Only extract quoted text if it's substantial (actual script, not objection echo)
-            // Short quotes like "do I need this?" are the objection, not the response
             const quotedMatch = text.match(/"([^"]+)"/);
-            if (quotedMatch && quotedMatch[1].length > 60 && !quotedMatch[1].endsWith('?')) {
-                return quotedMatch[1];
-            }
+            if (quotedMatch) return quotedMatch[1];
             
             const sayMatch = text.match(/SAY THIS[:\s]*(.+?)(?=\n|WHY|$)/is);
             if (sayMatch) return sayMatch[1].trim().replace(/^[""]|[""]$/g, '');
             
-            // For Globe Life contextualized scripts, return the full text
-            // (they don't have SAY THIS markers, just the script itself)
             return text
                 .replace(/^[🎯💬📝🔑]\s*/gm, '')
                 .replace(/^DETECTED:.*?\n/i, '')
@@ -2592,23 +2879,12 @@
         }
         
         function showGuidance(text) {
-            // Clear any previous animation
-            if (state.streamInterval) {
-                clearInterval(state.streamInterval);
-                state.streamInterval = null;
-            }
-            
             dom.listeningState.style.display = 'none';
-            dom.guidanceState.classList.remove('active'); // Reset for re-trigger animation
-            
-            // Enable scrolling from top
+            dom.guidanceState.classList.remove('active');
             dom.teleprompter.classList.add('has-guidance');
             
-            // Format text: bold numbers/money and highlight "SAY THIS" content
-            let formattedText = text
-                .replace(/(\$[\d,]+|\d+%|\d+,\d+)/g, '<strong>$1</strong>');
+            let formattedText = text.replace(/(\$[\d,]+|\d+%|\d+,\d+)/g, '<strong>$1</strong>');
             
-            // If there's quoted text, make it stand out as the key phrase
             const quotedMatch = formattedText.match(/"([^"]+)"/);
             if (quotedMatch) {
                 formattedText = formattedText.replace(
@@ -2617,90 +2893,21 @@
                 );
             }
             
-            // INSTANT render - no typewriter delay
             dom.guidanceText.innerHTML = formattedText;
             
-            // Trigger fade-in animation
             requestAnimationFrame(() => {
                 dom.guidanceState.classList.add('active');
             });
         }
         
         function dismissGuidance() {
-            console.log('[DISMISS] dismissGuidance called');
-            
-            if (state.streamInterval) {
-                clearInterval(state.streamInterval);
-                state.streamInterval = null;
-            }
-            
             dom.guidanceState.classList.remove('active');
             dom.listeningState.style.display = 'flex';
             dom.teleprompter.classList.remove('has-guidance');
             hideDownCloseIndicator();
-            
-            // Clear text content
             dom.guidanceText.innerHTML = '';
             state.streamingGuidance = '';
             state.hasVibratedForCurrentGuidance = false;
-            
-            console.log('[DISMISS] Panel hidden, text cleared');
-        }
-        
-        // ==================== CALL CONTROLS ====================
-        async function startCall() {
-            dom.startBtn.disabled = true;
-            setStatus('connecting');
-            
-            try {
-                initAudioNotify();
-                
-                // Connect WebSocket FIRST (before audio setup)
-                await connect();
-                
-                // Set listening flag BEFORE audio setup so the processor sends data
-                state.isListening = true;
-                
-                // NOW setup audio (processor will start sending immediately)
-                if (!await setupAudio()) {
-                    throw new Error('Microphone access denied');
-                }
-                
-                state.guidanceHistory = [];
-                state.selectedTipIndex = null;
-                state.callOutcome = null;
-                state.downCloseLevel = 0;
-                
-                // Reset captions
-                resetCaptions();
-                
-                showScreen('callScreen');
-                startTimer();
-                
-                if ('wakeLock' in navigator) {
-                    try { await navigator.wakeLock.request('screen'); } catch (e) {}
-                }
-                
-            } catch (e) {
-                console.error('Start failed:', e);
-                setStatus('error');
-                state.isListening = false;
-                stopAudio();
-                if (state.ws) state.ws.close();
-            }
-            
-            dom.startBtn.disabled = false;
-        }
-        
-        function endCall() {
-            state.isListening = false;
-            stopAudio();
-            if (state.ws) state.ws.close();
-            stopTimer();
-            if (state.streamInterval) clearInterval(state.streamInterval);
-            
-            setStatus('');
-            showScreen('outcomeScreen');
         }
         
         // ==================== OUTCOME ====================
@@ -2752,7 +2959,7 @@
         
         async function submitOutcome() {
             const payload = {
-                client_id: state.clientId,
+                session_id: state.sessionId,
                 duration_seconds: state.seconds,
                 outcome: state.callOutcome ? 'closed' : 'not_closed',
                 guidance_count: state.guidanceHistory.length,
@@ -2763,7 +2970,6 @@
                 timestamp: new Date().toISOString(),
                 agency: state.agency,
                 agent_name: state.agentName,
-                agent_id: state.agentId,
                 call_type: state.callType,
                 down_close_level: state.downCloseLevel
             };
@@ -2790,6 +2996,9 @@
             state.guidanceHistory = [];
             state.selectedTipIndex = null;
             state.downCloseLevel = 0;
+            state.sessionId = null;
+            state.clientPhone = null;
+            if (dom.clientPhoneInput) dom.clientPhoneInput.value = '';
             dismissGuidance();
             resetCaptions();
             showScreen('startScreen');
@@ -2804,8 +3013,10 @@
         }
         
         function handleBack() {
-            if (state.isListening) {
-                if (confirm('End this call?')) endCall();
+            if (state.isInCall) {
+                if (confirm('End this session?')) endCall();
+            } else if (dom.connectingScreen.classList.contains('active')) {
+                cancelCall();
             } else if (dom.reviewScreen.classList.contains('active') || 
                        dom.nocloseScreen.classList.contains('active') ||
                        dom.outcomeScreen.classList.contains('active')) {
@@ -2836,12 +3047,13 @@
             setTimeout(hidePageLoader, 300);
         });
         
-        // Initialize on load
+        // Initialize
         init();
         
         // ==================== PUBLIC API ====================
         return {
             startCall,
+            cancelCall,
             endCall,
             dismissGuidance,
             recordOutcome,
@@ -2852,6 +3064,7 @@
             saveIdentity,
             changeAgent,
             setCallType,
+            closeErrorModal,
             getState: () => state
         };
     })();

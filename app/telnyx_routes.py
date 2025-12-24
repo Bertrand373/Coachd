@@ -1,6 +1,7 @@
 """
-Coachd Telnyx Routes
-All Telnyx webhook handlers and API endpoints for TeXML integration
+Coachd Telnyx Routes - Dual-Channel Click-to-Call
+==================================================
+POST /start-call → calls agent → agent answers → dials client → bridged
 """
 
 import logging
@@ -9,20 +10,17 @@ from datetime import datetime
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
-from typing import Optional
 
 from .config import settings
 from .telnyx_bridge import (
     is_telnyx_configured,
-    initiate_agent_call,
-    generate_agent_conference_texml,
-    generate_client_conference_texml,
-    generate_inbound_texml,
-    add_client_to_conference,
+    normalize_phone,
+    initiate_click_to_call,
+    dial_client,
+    generate_agent_answered_texml,
+    generate_client_answered_texml,
     end_conference,
-    hangup_call,
-    get_recording_url,
-    _decode_client_state
+    hangup_call
 )
 from .call_session import session_manager, CallStatus
 from .usage_tracker import log_telnyx_usage
@@ -32,49 +30,38 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/telnyx", tags=["telnyx"])
 
 
-# ============ PYDANTIC MODELS ============
-
 class StartCallRequest(BaseModel):
     agent_phone: str
-
-class DialClientRequest(BaseModel):
-    session_id: str
-    client_phone: str
-    agent_caller_id: Optional[str] = None
+    client_phone: str  # Required for click-to-call
 
 class EndCallRequest(BaseModel):
     session_id: str
 
-
-# ============ HELPER FUNCTIONS ============
 
 def texml_response(content: str) -> Response:
     """Return TeXML with proper content type"""
     return Response(content=content, media_type="application/xml")
 
 
-# ============ API ENDPOINTS (Called by Frontend) ============
-
 @router.post("/start-call")
 async def start_call(data: StartCallRequest):
     """
-    Start a new coaching session.
-    App calls the agent, then agent 3-ways in their client.
+    Start click-to-call session.
+    Calls agent first, then client when agent answers.
     """
     if not is_telnyx_configured():
         raise HTTPException(status_code=503, detail="Telnyx not configured")
     
-    # Normalize phone number
-    agent_phone = data.agent_phone
-    if not agent_phone.startswith("+"):
-        digits = agent_phone.replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
-        agent_phone = f"+1{digits}" if len(digits) == 10 else f"+{digits}"
+    agent_phone = normalize_phone(data.agent_phone)
+    client_phone = normalize_phone(data.client_phone)
+    
+    if not client_phone:
+        raise HTTPException(status_code=400, detail="Client phone number required")
     
     # Create session
     session = await session_manager.create_session(agent_phone)
     
-    # Call the agent
-    result = initiate_agent_call(agent_phone, session.session_id)
+    result = initiate_click_to_call(agent_phone, client_phone, session.session_id)
     
     if not result["success"]:
         await session_manager.update_session(session.session_id, status=CallStatus.FAILED)
@@ -83,42 +70,15 @@ async def start_call(data: StartCallRequest):
     await session_manager.update_session(
         session.session_id,
         agent_call_sid=result["call_control_id"],
+        client_phone=client_phone,
         status=CallStatus.AGENT_RINGING
     )
     
     return {
         "success": True,
         "session_id": session.session_id,
-        "message": "Calling your phone now. Answer to connect."
+        "message": "Calling your phone now. Answer to connect with your client."
     }
-
-
-@router.post("/dial-client")
-async def dial_client(data: DialClientRequest):
-    """Add client to existing conference"""
-    session = await session_manager.get_session(data.session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Normalize phone number
-    client_phone = data.client_phone
-    if not client_phone.startswith("+"):
-        digits = client_phone.replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
-        client_phone = f"+1{digits}" if len(digits) == 10 else f"+{digits}"
-    
-    result = add_client_to_conference(client_phone, data.session_id, data.agent_caller_id)
-    
-    if not result["success"]:
-        raise HTTPException(status_code=500, detail=result.get("error", "Failed to dial client"))
-    
-    await session_manager.update_session(
-        data.session_id,
-        client_phone=client_phone,
-        client_call_sid=result["call_control_id"],
-        status=CallStatus.CLIENT_RINGING
-    )
-    
-    return {"success": True, "message": f"Dialing {client_phone}..."}
 
 
 @router.post("/end-call")
@@ -126,7 +86,6 @@ async def end_call(data: EndCallRequest):
     """End a call session"""
     session = await session_manager.get_session(data.session_id)
     
-    # Log usage
     if session and session.started_at:
         duration = session.get_duration() or 0
         log_telnyx_usage(
@@ -155,60 +114,23 @@ async def get_status():
     """Check if Telnyx is configured"""
     return {
         "configured": is_telnyx_configured(),
-        "phone_number": settings.telnyx_phone_number if is_telnyx_configured() else None,
-        "base_url": settings.base_url
+        "phone_number": settings.telnyx_phone_number if is_telnyx_configured() else None
     }
 
 
-# ============ TELNYX WEBHOOKS (Called by Telnyx) ============
-
-@router.post("/incoming")
-async def incoming_call(request: Request):
-    """
-    Handle inbound calls to the Telnyx number.
-    Agent calls this number to start coaching.
-    """
-    try:
-        form = await request.form()
-        caller = form.get("From", "unknown")
-        call_sid = form.get("CallSid", str(uuid.uuid4()))
-        
-        logger.info(f"Incoming call from {caller}")
-        
-        # Create a session for this inbound call
-        session = await session_manager.create_session(caller)
-        session_id = session.session_id
-        
-        await session_manager.update_session(
-            session_id,
-            agent_call_sid=call_sid,
-            status=CallStatus.AGENT_CONNECTED,
-            started_at=datetime.utcnow()
-        )
-        
-        # Return TeXML to put caller in conference with streaming
-        texml = generate_inbound_texml(session_id)
-        return texml_response(texml)
-        
-    except Exception as e:
-        logger.error(f"Error handling incoming call: {e}")
-        texml = """<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say>Sorry, there was an error. Please try again.</Say>
-    <Hangup />
-</Response>"""
-        return texml_response(texml)
-
+# ============ TELNYX WEBHOOKS ============
 
 @router.post("/agent-answered")
 async def agent_answered(request: Request):
     """
-    Webhook: Agent has answered the outbound call.
-    Return TeXML to put them in conference with streaming.
+    Webhook: Agent answered. Now dial the client.
     """
     session_id = request.query_params.get("session_id", "unknown")
+    client_phone = request.query_params.get("client_phone")
+    agent_phone = request.query_params.get("agent_phone")
     
-    logger.info(f"Agent answered for session {session_id}")
+    logger.info(f"[Webhook] Agent answered: session={session_id}")
+    print(f"[Webhook] Agent answered: session={session_id}, client={client_phone}", flush=True)
     
     await session_manager.update_session(
         session_id,
@@ -216,28 +138,52 @@ async def agent_answered(request: Request):
         started_at=datetime.utcnow()
     )
     
-    texml = generate_agent_conference_texml(session_id)
+    # Dial the client
+    if client_phone:
+        result = dial_client(client_phone, agent_phone, session_id)
+        
+        if result["success"]:
+            await session_manager.update_session(
+                session_id,
+                client_call_sid=result["call_control_id"],
+                status=CallStatus.CLIENT_RINGING
+            )
+            await session_manager._broadcast_to_session(session_id, {
+                "type": "client_dialing",
+                "message": "Dialing client..."
+            })
+        else:
+            logger.error(f"Failed to dial client: {result.get('error')}")
+            await session_manager._broadcast_to_session(session_id, {
+                "type": "error",
+                "message": f"Failed to dial client: {result.get('error')}"
+            })
     
-    # Log the TeXML being returned
-    print(f"[TeXML] Returning for session {session_id}:", flush=True)
-    print(texml, flush=True)
-    
+    # Return TeXML to put agent in conference
+    texml = generate_agent_answered_texml(session_id)
     return texml_response(texml)
 
 
 @router.post("/client-answered")
 async def client_answered(request: Request):
     """
-    Webhook: Client has answered.
-    Return TeXML to put them in the conference.
+    Webhook: Client answered. Bridge complete.
     """
     session_id = request.query_params.get("session_id", "unknown")
     
-    logger.info(f"Client answered for session {session_id}")
+    logger.info(f"[Webhook] Client answered: session={session_id}")
+    print(f"[Webhook] Client answered: session={session_id}", flush=True)
     
     await session_manager.update_session(session_id, status=CallStatus.IN_PROGRESS)
     
-    texml = generate_client_conference_texml(session_id)
+    # Notify frontend
+    await session_manager._broadcast_to_session(session_id, {
+        "type": "client_connected",
+        "message": "Client connected - coaching active"
+    })
+    
+    # Return TeXML to stream client audio and join conference
+    texml = generate_client_answered_texml(session_id)
     return texml_response(texml)
 
 
@@ -261,74 +207,13 @@ async def call_status(request: Request):
     return Response(content="", status_code=200)
 
 
-@router.post("/conference-status")
-async def conference_status(request: Request):
-    """Webhook: Conference events"""
-    try:
-        form = await request.form()
-        event = form.get("StatusCallbackEvent")
-        conference_sid = form.get("ConferenceSid")
-        session_id = request.query_params.get("session_id")
-        
-        logger.info(f"Conference event: {event} for session {session_id}")
-        
-        if session_id and conference_sid:
-            await session_manager.update_session(session_id, conference_sid=conference_sid)
-        
-    except Exception as e:
-        logger.error(f"Error handling conference status: {e}")
-    
-    return Response(content="", status_code=200)
-
-
-@router.post("/recording-complete")
-async def recording_complete(request: Request):
-    """Webhook: Recording finished"""
-    try:
-        form = await request.form()
-        recording_sid = form.get("RecordingSid")
-        recording_status = form.get("RecordingStatus")
-        session_id = request.query_params.get("session_id")
-        
-        logger.info(f"Recording complete: {recording_sid} for session {session_id}")
-        
-        if session_id and recording_sid and recording_status == "completed":
-            recording_url = get_recording_url(recording_sid)
-            await session_manager.update_session(
-                session_id,
-                recording_sid=recording_sid,
-                recording_url=recording_url
-            )
-    except Exception as e:
-        logger.error(f"Error handling recording: {e}")
-    
-    return Response(content="", status_code=200)
-
-
 @router.post("/webhook")
 async def main_webhook(request: Request):
-    """
-    Main webhook handler for Call Control API events.
-    Telnyx can send various event types here.
-    """
+    """Main webhook for Call Control API events"""
     try:
         body = await request.json()
-        data = body.get("data", {})
-        event_type = data.get("event_type", "")
-        payload = data.get("payload", {})
-        
+        event_type = body.get("data", {}).get("event_type", "")
         logger.info(f"Webhook event: {event_type}")
-        
-        # Extract session from client_state
-        client_state = payload.get("client_state", "")
-        state_data = _decode_client_state(client_state) if client_state else {}
-        session_id = state_data.get("session_id")
-        
-        if event_type == "call.hangup" and session_id:
-            session = await session_manager.get_session(session_id)
-            if session:
-                await session_manager.end_session(session_id)
-        
     except Exception as e:
         logger.error(f"Webhook error: {e}")
     

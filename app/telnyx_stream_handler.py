@@ -1,23 +1,17 @@
 """
-Coachd Telnyx Stream Handler
-Receives audio from Telnyx media streams, processes through Deepgram with diarization,
-and broadcasts transcripts + guidance to the frontend.
+Coachd Telnyx Stream Handler - Dual-Channel
+============================================
+- Client stream: 100% client audio → Deepgram → guidance triggers
+- Agent stream: 100% agent audio → recording only (no Deepgram)
 
-Speaker Identification Strategy:
-- Both speakers start as "unknown" - transcripts shown but no guidance
-- Listen for agent introduction: "this is [name] with Globe Life/Liberty National"
-- When intro detected → THAT speaker = Agent, the OTHER = Client
-- Only trigger guidance on CLIENT speech AFTER roles are locked
-- This handles edge cases where either party speaks first
+No diarization needed = 100% speaker accuracy
 """
 
 import asyncio
 import base64
-import json
 import time
 import audioop
-from typing import Optional, Callable, Dict, Set, List
-from fastapi import WebSocket
+from typing import Dict
 
 from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions
 
@@ -31,124 +25,83 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class TelnyxStreamHandler:
+class ClientStreamHandler:
     """
-    Handles Telnyx media stream WebSocket connections.
-    Converts μ-law audio to PCM, sends to Deepgram with diarization,
-    and broadcasts results to the session's frontend clients.
-    
-    Speaker Identification Strategy:
-    - Both speakers start as "unknown"
-    - Listen for agent introduction: "this is [name] with Globe/Liberty"
-    - When detected, THAT speaker = Agent, the OTHER = Client
-    - Only trigger guidance AFTER roles are locked in
+    Handles CLIENT audio only.
+    All audio → Deepgram → objection detection → guidance.
     """
     
-    # Deepgram configuration
-    SAMPLE_RATE = 8000  # Telnyx sends 8kHz audio
-    DEEPGRAM_SAMPLE_RATE = 8000  # Match Telnyx rate
-    
-    # Speaker identification
-    SPEAKER_CLIENT = "client"
-    SPEAKER_AGENT = "agent"
-    SPEAKER_UNKNOWN = "unknown"
-    
-    # Agent introduction patterns (Globe Life specific)
-    AGENT_INTRO_PATTERNS = [
-        "this is",  # "this is [name] with Globe Life"
-        "my name is",  # "my name is [name] and"
-        "i'm calling from",  # "I'm calling from Globe Life"
-        "with globe life",
-        "with liberty national",
-        "your insurance company",
-    ]
-    
-    # Guidance configuration
+    SAMPLE_RATE = 8000
     GUIDANCE_COOLDOWN_SECONDS = 3.0
     MIN_WORDS_FOR_GUIDANCE = 8
-    GUIDANCE_TIMEOUT_SECONDS = 8.0
+    
+    HOT_TRIGGERS = [
+        "can't afford", "too expensive", "not interested", "no money",
+        "think about it", "talk to my", "spouse", "wife", "husband",
+        "call back", "busy", "not a good time", "don't need",
+        "already have", "too much", "let me think", "send information",
+        "how much", "what's the cost", "what's the price",
+        "i need to", "let me", "give me some time", "not right now",
+        "i'm not sure", "that's a lot", "can't do that", "don't have"
+    ]
     
     def __init__(self, session_id: str):
         self.session_id = session_id
         self.deepgram = None
         self.connection = None
         self.is_running = False
-        self._loop = None
         
-        # Speaker tracking - wait for agent introduction before locking roles
-        self._speaker_map: Dict[int, str] = {}  # Maps Deepgram speaker ID -> role
-        self._roles_locked = False  # True once we've identified agent
-        self._agent_speaker_id: Optional[int] = None
-        self._pending_transcripts: List[dict] = []  # Buffer until roles locked
-        
-        # Transcript buffer per speaker
         self._client_buffer = ""
-        self._agent_buffer = ""
         self._full_transcript = []
         
-        # Guidance state
         self._last_guidance_time = 0
         self._generating_guidance = False
         self._rag_engine = None
         self._state_machine = None
         
-        # Usage tracking
         self._total_audio_bytes = 0
         self._session_start_time = None
         self._agency = None
         
-        logger.info(f"[TelnyxStream] Handler created for session {session_id}")
+        logger.info(f"[ClientStream] Created for session {session_id}")
     
     async def start(self) -> bool:
-        """Initialize Deepgram connection with diarization"""
-        logger.info(f"[TelnyxStream] Starting for session {self.session_id}")
+        """Initialize Deepgram for client audio"""
+        logger.info(f"[ClientStream] Starting for {self.session_id}")
+        print(f"[ClientStream] Starting for {self.session_id}", flush=True)
         
-        self._loop = asyncio.get_running_loop()
         self._session_start_time = time.time()
         
-        # Get session info for agency context
         session = await session_manager.get_session(self.session_id)
         if session:
             self._agency = getattr(session, 'agency', None)
         
-        # Initialize RAG engine (optional - continue without it)
         try:
             self._rag_engine = get_rag_engine()
         except Exception as e:
-            logger.warning(f"[TelnyxStream] RAG engine not available: {e}")
-            self._rag_engine = None
+            logger.warning(f"[ClientStream] RAG unavailable: {e}")
         
-        # Initialize state machine (optional - continue without it)
         try:
             self._state_machine = CallStateMachine(session_id=self.session_id)
         except Exception as e:
-            logger.warning(f"[TelnyxStream] State machine not available: {e}")
-            self._state_machine = None
+            logger.warning(f"[ClientStream] State machine unavailable: {e}")
         
-        # Initialize Deepgram (optional - continue without it for basic call flow)
         if not settings.deepgram_api_key:
-            logger.warning("[TelnyxStream] No Deepgram API key - transcription disabled")
+            logger.warning("[ClientStream] No Deepgram key")
             self.is_running = True
-            await self._broadcast_to_frontend({
-                "type": "ready",
-                "message": "Call connected (transcription unavailable)"
-            })
+            await self._broadcast({"type": "ready", "message": "Connected (no transcription)"})
             return True
         
         try:
             self.deepgram = DeepgramClient(settings.deepgram_api_key)
-            
-            # Use ASYNC live client for async context
             self.connection = self.deepgram.listen.asynclive.v("1")
-            print(f"[TelnyxStream] Created Deepgram ASYNC client", flush=True)
             
-            # Register event handlers
             self.connection.on(LiveTranscriptionEvents.Open, self._on_open)
             self.connection.on(LiveTranscriptionEvents.Transcript, self._on_transcript)
             self.connection.on(LiveTranscriptionEvents.Error, self._on_error)
             self.connection.on(LiveTranscriptionEvents.Close, self._on_close)
             
-            # Configure with diarization enabled
+            # NO DIARIZATION - all audio is client
             options = LiveOptions(
                 model="nova-2",
                 language="en-US",
@@ -156,379 +109,113 @@ class TelnyxStreamHandler:
                 punctuate=True,
                 interim_results=True,
                 utterance_end_ms=1000,
-                # DIARIZATION - identify different speakers
-                diarize=True,
-                # Audio format from Telnyx (after μ-law to PCM conversion)
                 encoding="linear16",
-                sample_rate=self.DEEPGRAM_SAMPLE_RATE,
+                sample_rate=self.SAMPLE_RATE,
                 channels=1
             )
             
-            print(f"[TelnyxStream] Starting Deepgram async connection...", flush=True)
-            
-            # Async start
             await self.connection.start(options)
-            print(f"[TelnyxStream] Deepgram async connection started", flush=True)
-            
             self.is_running = True
-            logger.info(f"[TelnyxStream] Deepgram connected with diarization")
             
-            # Notify frontend that we're ready
-            await self._broadcast_to_frontend({
+            print(f"[ClientStream] Deepgram connected (client-only)", flush=True)
+            
+            await self._broadcast({
                 "type": "ready",
-                "message": "Live transcription active"
+                "message": "Live coaching active"
+            })
+            
+            # Immediately notify that speakers are identified (they're always known in dual-channel)
+            await self._broadcast({
+                "type": "speakers_identified",
+                "message": "Client connected - coaching active"
             })
             
             return True
-                
+            
         except Exception as e:
-            logger.error(f"[TelnyxStream] Error starting Deepgram: {e} - continuing without transcription")
-            print(f"[TelnyxStream] Deepgram error: {e}", flush=True)
-            import traceback
-            traceback.print_exc()
-            self.deepgram = None
-            self.connection = None
+            logger.error(f"[ClientStream] Deepgram error: {e}")
             self.is_running = True
-            await self._broadcast_to_frontend({
-                "type": "ready",
-                "message": "Call connected (transcription unavailable)"
-            })
+            await self._broadcast({"type": "ready", "message": "Connected (transcription unavailable)"})
             return True
     
     async def handle_telnyx_message(self, message: dict):
-        """
-        Process incoming Telnyx WebSocket message.
-        Telnyx sends JSON with base64-encoded μ-law audio.
-        """
+        """Process Telnyx message with client audio"""
         event = message.get("event")
         
         if event == "connected":
-            logger.info(f"[TelnyxStream] Telnyx stream connected")
-            print(f"[TelnyxStream] Telnyx stream connected - full message: {message}", flush=True)
+            print(f"[ClientStream] Telnyx connected", flush=True)
             
         elif event == "start":
-            # Stream starting - contains metadata
-            stream_sid = message.get("stream_sid")
-            logger.info(f"[TelnyxStream] Stream started: {stream_sid}")
-            print(f"[TelnyxStream] Stream started - full message: {message}", flush=True)
+            print(f"[ClientStream] Stream started", flush=True)
             
         elif event == "media":
-            # Audio data
             media = message.get("media", {})
             payload = media.get("payload")
             
             if payload:
                 try:
-                    # Decode base64 μ-law audio
                     ulaw_audio = base64.b64decode(payload)
                     self._total_audio_bytes += len(ulaw_audio)
-                    
-                    # Convert μ-law to linear PCM (16-bit)
                     pcm_audio = audioop.ulaw2lin(ulaw_audio, 2)
                     
-                    # Send to Deepgram if connected (async)
                     if self.connection and self.is_running:
                         await self.connection.send(pcm_audio)
-                        
-                        # Log occasionally
-                        if self._total_audio_bytes % 16000 < 200:  # ~every second
-                            print(f"[TelnyxStream] Sent to Deepgram: {self._total_audio_bytes} total bytes", flush=True)
-                    else:
-                        # Got audio but no Deepgram connection
-                        if self._total_audio_bytes % 32000 < 400:
-                            print(f"[TelnyxStream] Audio received (no Deepgram): {self._total_audio_bytes} bytes", flush=True)
-                    
                 except Exception as e:
-                    logger.error(f"[TelnyxStream] Error processing audio: {e}")
-                    print(f"[TelnyxStream] Audio error: {e}", flush=True)
+                    logger.error(f"[ClientStream] Audio error: {e}")
                     
         elif event == "stop":
-            logger.info(f"[TelnyxStream] Stream stopped")
-            print(f"[TelnyxStream] Stream stopped - full message: {message}", flush=True)
+            print(f"[ClientStream] Stream stopped", flush=True)
             await self.stop()
-        else:
-            # Unknown event
-            print(f"[TelnyxStream] Unknown event: {event} - message: {message}", flush=True)
     
     async def _on_open(self, *args, **kwargs):
-        """Deepgram connection opened"""
-        logger.info(f"[TelnyxStream] Deepgram connection open")
-        print(f"[TelnyxStream] Deepgram WebSocket OPEN - ready for audio", flush=True)
+        print(f"[ClientStream] Deepgram open", flush=True)
     
     async def _on_transcript(self, *args, **kwargs):
-        """Handle transcript from Deepgram (async handler)"""
+        """Handle transcript - ALL is client speech"""
         try:
             result = kwargs.get('result') or (args[1] if len(args) > 1 else None)
             if not result:
                 return
             
-            channel = result.channel
-            alternatives = channel.alternatives
-            
+            alternatives = result.channel.alternatives
             if not alternatives:
                 return
             
-            alt = alternatives[0]
-            transcript = alt.transcript
+            transcript = alternatives[0].transcript
             is_final = result.is_final
             
             if not transcript:
                 return
             
-            # Get speaker from diarization (0 or 1)
-            words = alt.words if hasattr(alt, 'words') else []
-            speaker_id = None
+            print(f"[ClientStream] CLIENT ({'FINAL' if is_final else 'interim'}): {transcript[:60]}", flush=True)
             
-            if words:
-                for word in words:
-                    if hasattr(word, 'speaker') and word.speaker is not None:
-                        speaker_id = word.speaker
-                        break
-            
-            # Determine speaker role - use intro detection
-            speaker_role = self._determine_speaker_role_with_intro(speaker_id, transcript if is_final else "")
-            
-            # Log transcript
-            print(f"[TelnyxStream] TRANSCRIPT ({speaker_role}, {'FINAL' if is_final else 'interim'}): {transcript[:80]}", flush=True)
-            
-            # Process transcript
-            await self._process_transcript_smart(transcript, is_final, speaker_role, speaker_id)
-                
-        except Exception as e:
-            logger.error(f"[TelnyxStream] Error in transcript handler: {e}")
-            print(f"[TelnyxStream] Transcript error: {e}", flush=True)
-            import traceback
-            traceback.print_exc()
-    
-    def _determine_speaker_role_with_intro(self, speaker_id: int, transcript: str = "") -> str:
-        """
-        Determine if speaker is agent or client based on agent introduction.
-        
-        Strategy:
-        - Wait for agent intro phrase ("this is [name] with Globe Life/Liberty National")
-        - Speaker who says intro = Agent
-        - Other speaker = Client
-        - Before intro detected: all speakers labeled "unknown" (no guidance triggers)
-        """
-        if speaker_id is None:
-            return "unknown"
-        
-        # If roles already locked, use stored mapping
-        if self._roles_locked:
-            if speaker_id == self._agent_speaker_id:
-                return "agent"
-            else:
-                return "client"
-        
-        # Roles NOT locked yet - check if this transcript contains agent introduction
-        if transcript and self._check_for_agent_intro(transcript):
-            # FOUND AGENT! Lock roles
-            self._agent_speaker_id = speaker_id
-            self._roles_locked = True
-            
-            print(f"[TelnyxStream] 🔒 AGENT IDENTIFIED! Speaker {speaker_id} said intro", flush=True)
-            print(f"[TelnyxStream] 🔒 Intro: '{transcript[:60]}...'", flush=True)
-            print(f"[TelnyxStream] 🔒 Roles locked - guidance will trigger on other speaker", flush=True)
-            
-            # Notify frontend
-            asyncio.create_task(self._broadcast_to_frontend({
-                "type": "speakers_identified",
-                "message": "Agent identified - live coaching active"
-            }))
-            
-            return "agent"
-        
-        # Not locked yet - return unknown (guidance won't trigger)
-        return "unknown"
-    
-    async def _process_transcript_smart(self, transcript: str, is_final: bool, speaker_role: str, speaker_id: int):
-        """Process transcript and trigger guidance ONLY on client speech"""
-        
-        # Map speaker role to UI label
-        # Before roles locked: show as neutral "unknown"
-        # After roles locked: show agent/caller correctly
-        if speaker_role == "unknown":
-            ui_speaker = "unknown"  # Frontend can display as "Speaker" or similar
-        elif speaker_role == "client":
-            ui_speaker = "caller"
-        else:
-            ui_speaker = "agent"
-        
-        # Broadcast to frontend
-        await self._broadcast_to_frontend({
-            "type": "transcript",
-            "text": transcript,
-            "speaker": ui_speaker,
-            "is_final": is_final,
-            "roles_locked": self._roles_locked
-        })
-        
-        # Only trigger guidance on FINAL transcripts from CLIENT (after roles locked)
-        if not is_final:
-            return
-        
-        if speaker_role != "client":
-            # Agent or unknown speaking - no guidance
-            return
-        
-        # Check for objection triggers from client
-        transcript_lower = transcript.lower()
-        should_trigger = False
-        trigger_phrase = None
-        
-        for trigger in self.HOT_TRIGGERS:
-            if trigger in transcript_lower:
-                should_trigger = True
-                trigger_phrase = trigger
-                break
-        
-        # Also trigger on longer client statements (potential objections)
-        word_count = len(transcript.split())
-        if word_count >= 10 and not should_trigger:
-            should_trigger = True
-            trigger_phrase = f"{word_count} words"
-        
-        if should_trigger:
-            print(f"[TelnyxStream] 🎯 GUIDANCE TRIGGER from CLIENT: '{trigger_phrase}'", flush=True)
-            if self._rag_engine:
-                await self._generate_guidance(transcript)
-    
-    def _identify_speaker(self, speaker_id: Optional[int], transcript: str = "") -> str:
-        """
-        Identify speaker role based on agent introduction detection.
-        
-        Strategy:
-        - Both speakers start as "unknown"
-        - When we detect agent intro phrase, THAT speaker becomes Agent
-        - The other speaker ID becomes Client
-        - Only return definitive roles after locking
-        """
-        if speaker_id is None:
-            return self.SPEAKER_UNKNOWN
-        
-        # If roles already locked, use the map
-        if self._roles_locked:
-            return self._speaker_map.get(speaker_id, self.SPEAKER_UNKNOWN)
-        
-        # Roles not locked yet - check if this transcript contains agent introduction
-        if transcript and self._check_for_agent_intro(transcript):
-            # This speaker is the agent!
-            self._agent_speaker_id = speaker_id
-            self._speaker_map[speaker_id] = self.SPEAKER_AGENT
-            self._roles_locked = True
-            
-            logger.info(f"[TelnyxStream] AGENT IDENTIFIED! Speaker {speaker_id} introduced themselves")
-            logger.info(f"[TelnyxStream] Roles locked - guidance now active")
-            
-            # Notify frontend that we've identified the agent
-            if self._loop and self._loop.is_running():
-                asyncio.run_coroutine_threadsafe(
-                    self._broadcast_to_frontend({
-                        "type": "speakers_identified",
-                        "message": "Agent identified - live coaching active"
-                    }),
-                    self._loop
-                )
-            
-            return self.SPEAKER_AGENT
-        
-        # Not locked yet, return unknown
-        return self.SPEAKER_UNKNOWN
-    
-    def _check_for_agent_intro(self, transcript: str) -> bool:
-        """
-        Check if transcript contains agent introduction patterns.
-        Globe Life agents always introduce themselves:
-        - "this is [name] with Globe Life/Liberty National"
-        - "my name is [name]"
-        """
-        text_lower = transcript.lower()
-        
-        # Must contain at least one intro pattern
-        has_intro = False
-        for pattern in self.AGENT_INTRO_PATTERNS:
-            if pattern in text_lower:
-                has_intro = True
-                break
-        
-        if not has_intro:
-            return False
-        
-        # Additional validation: should mention company or have "this is" + "with"
-        is_company_intro = (
-            "globe life" in text_lower or
-            "liberty national" in text_lower or
-            "insurance company" in text_lower or
-            ("this is" in text_lower and "with" in text_lower) or
-            ("my name is" in text_lower)
-        )
-        
-        return is_company_intro
-    
-    def _get_other_speaker_role(self, speaker_id: int) -> str:
-        """
-        Once agent is identified, any OTHER speaker is the client.
-        """
-        if not self._roles_locked:
-            return self.SPEAKER_UNKNOWN
-        
-        if speaker_id == self._agent_speaker_id:
-            return self.SPEAKER_AGENT
-        
-        # Different speaker ID = Client
-        if speaker_id not in self._speaker_map:
-            self._speaker_map[speaker_id] = self.SPEAKER_CLIENT
-            logger.info(f"[TelnyxStream] Speaker {speaker_id} identified as CLIENT")
-        
-        return self._speaker_map[speaker_id]
-    
-    async def _process_transcript(self, transcript: str, is_final: bool, speaker: str, speaker_id: Optional[int] = None):
-        """Process transcript and trigger guidance if needed"""
-        
-        # Broadcast transcript to frontend (always, even before roles locked)
-        await self._broadcast_to_frontend({
-            "type": "transcript",
-            "text": transcript,
-            "is_final": is_final,
-            "speaker": speaker,
-            "roles_locked": self._roles_locked
-        })
-        
-        # Also add to session for history
-        await session_manager.add_transcript(
-            self.session_id, 
-            transcript, 
-            speaker=speaker, 
-            is_final=is_final
-        )
-        
-        # Buffer transcripts
-        if is_final:
-            self._full_transcript.append({
-                "speaker": speaker,
-                "speaker_id": speaker_id,
+            # Broadcast to frontend - always "caller" (client)
+            await self._broadcast({
+                "type": "transcript",
                 "text": transcript,
-                "timestamp": time.time()
+                "speaker": "caller",
+                "is_final": is_final,
+                "roles_locked": True
             })
             
-            # Only process for guidance if roles are locked
-            if self._roles_locked:
-                if speaker == self.SPEAKER_CLIENT:
-                    self._client_buffer += " " + transcript
-                    
-                    # Feed to state machine
-                    if self._state_machine:
-                        self._state_machine.add_transcript(transcript, is_final=True)
-                    
-                    # Check for guidance triggers on CLIENT speech only
-                    await self._check_guidance_trigger(transcript)
-                    
-                elif speaker == self.SPEAKER_AGENT:
-                    self._agent_buffer += " " + transcript
+            if is_final:
+                self._client_buffer += " " + transcript
+                self._full_transcript.append({
+                    "speaker": "client",
+                    "text": transcript,
+                    "timestamp": time.time()
+                })
+                
+                if self._state_machine:
+                    self._state_machine.add_transcript(transcript, is_final=True)
+                
+                await self._check_guidance_trigger(transcript)
+                
+        except Exception as e:
+            logger.error(f"[ClientStream] Transcript error: {e}")
     
     async def _check_guidance_trigger(self, transcript: str):
-        """Check if we should generate guidance based on client speech"""
-        
+        """Check if client speech should trigger guidance"""
         if self._generating_guidance:
             return
         
@@ -536,37 +223,27 @@ class TelnyxStreamHandler:
         if now - self._last_guidance_time < self.GUIDANCE_COOLDOWN_SECONDS:
             return
         
-        # Check for hot trigger keywords (objections)
-        hot_triggers = [
-            "can't afford", "too expensive", "not interested", "no money",
-            "think about it", "talk to my", "spouse", "wife", "husband",
-            "call back", "busy", "not a good time", "don't need",
-            "already have", "too much", "let me think", "send information",
-            "how much", "what's the cost", "what's the price"
-        ]
-        
         transcript_lower = transcript.lower()
         triggered = False
         trigger_phrase = None
         
-        for trigger in hot_triggers:
+        for trigger in self.HOT_TRIGGERS:
             if trigger in transcript_lower:
                 triggered = True
                 trigger_phrase = trigger
                 break
         
-        # Also trigger on sufficient word count
-        word_count = len(self._client_buffer.split())
+        word_count = len(transcript.split())
         if not triggered and word_count >= self.MIN_WORDS_FOR_GUIDANCE:
             triggered = True
+            trigger_phrase = f"{word_count} words"
         
         if triggered:
-            logger.info(f"[TelnyxStream] Guidance triggered by: {trigger_phrase or 'word count'}")
-            await self._generate_guidance(transcript, trigger_phrase)
+            print(f"[ClientStream] 🎯 TRIGGER: '{trigger_phrase}'", flush=True)
+            await self._generate_guidance(transcript)
     
-    async def _generate_guidance(self, trigger_text: str, trigger_phrase: Optional[str] = None):
-        """Generate AI guidance based on conversation context"""
-        
+    async def _generate_guidance(self, trigger_text: str):
+        """Generate AI guidance"""
         if not self._rag_engine:
             return
         
@@ -574,135 +251,148 @@ class TelnyxStreamHandler:
         self._last_guidance_time = time.time()
         
         try:
-            # Build context
             context = CallContext(
-                call_type="presentation",  # Default, could be passed from session
+                call_type="presentation",
                 product="life insurance",
-                recent_transcript=self._client_buffer[-500:],  # Last 500 chars
+                recent_transcript=self._client_buffer[-500:],
                 client_profile={}
             )
             
-            # Notify frontend that guidance is starting
-            await self._broadcast_to_frontend({
+            await self._broadcast({
                 "type": "guidance_start",
-                "trigger": trigger_phrase or "conversation"
+                "trigger": trigger_text[:50]
             })
             
-            # Generate guidance with streaming
             guidance_text = ""
-            
             async for chunk in self._rag_engine.get_guidance_stream(
                 trigger_text,
                 context,
                 agency=self._agency
             ):
                 guidance_text += chunk
-                await self._broadcast_to_frontend({
+                await self._broadcast({
                     "type": "guidance_chunk",
                     "text": chunk
                 })
             
-            # Send completion
-            await self._broadcast_to_frontend({
+            await self._broadcast({
                 "type": "guidance_complete",
                 "full_text": guidance_text
             })
             
-            # Add to session history
             await session_manager.add_guidance(self.session_id, {
-                "trigger": trigger_phrase or trigger_text[:50],
+                "trigger": trigger_text[:50],
                 "response": guidance_text
             })
             
-            logger.info(f"[TelnyxStream] Guidance generated: {len(guidance_text)} chars")
-            
-        except asyncio.TimeoutError:
-            logger.warning(f"[TelnyxStream] Guidance generation timed out")
-            await self._broadcast_to_frontend({
-                "type": "guidance_error",
-                "message": "Guidance timed out"
-            })
         except Exception as e:
-            logger.error(f"[TelnyxStream] Error generating guidance: {e}")
+            logger.error(f"[ClientStream] Guidance error: {e}")
         finally:
             self._generating_guidance = False
     
-    async def _broadcast_to_frontend(self, message: dict):
-        """Send message to all frontend WebSocket clients for this session"""
+    async def _broadcast(self, message: dict):
+        """Send to frontend"""
         await session_manager._broadcast_to_session(self.session_id, message)
     
     async def _on_error(self, *args, **kwargs):
-        """Handle Deepgram error"""
-        error = kwargs.get('error') or (args[1] if len(args) > 1 else "Unknown error")
-        logger.error(f"[TelnyxStream] Deepgram error: {error}")
-        print(f"[TelnyxStream] Deepgram ERROR: {error}", flush=True)
-        # Don't set is_running to False - let audio continue flowing
-        # The error might be recoverable
+        error = kwargs.get('error') or (args[1] if len(args) > 1 else "Unknown")
+        logger.error(f"[ClientStream] Deepgram error: {error}")
     
     async def _on_close(self, *args, **kwargs):
-        """Handle Deepgram connection close"""
-        logger.info(f"[TelnyxStream] Deepgram connection closed")
-        print(f"[TelnyxStream] Deepgram WebSocket CLOSED", flush=True)
-        # Only stop if we initiated the close
-        # self.is_running = False
+        logger.info(f"[ClientStream] Deepgram closed")
     
     async def stop(self):
-        """Stop the stream handler and log usage"""
-        logger.info(f"[TelnyxStream] Stopping session {self.session_id}")
-        print(f"[TelnyxStream] Stopping session {self.session_id}", flush=True)
+        """Stop and log usage"""
+        print(f"[ClientStream] Stopping {self.session_id}", flush=True)
         self.is_running = False
         
-        # Log Deepgram usage
         if self._total_audio_bytes > 0 and self._session_start_time:
-            # Calculate duration (8kHz, 16-bit mono = 16000 bytes/sec)
-            bytes_per_second = self.SAMPLE_RATE * 2  # 2 bytes per sample
+            bytes_per_second = self.SAMPLE_RATE * 2
             duration_seconds = self._total_audio_bytes / bytes_per_second
-            
             cost = log_deepgram_usage(
                 duration_seconds=duration_seconds,
                 agency_code=self._agency,
                 session_id=self.session_id,
                 model='nova-2'
             )
-            logger.info(f"[TelnyxStream] Logged usage: {duration_seconds:.1f}s = ${cost:.4f}")
-            print(f"[TelnyxStream] Logged usage: {duration_seconds:.1f}s = ${cost:.4f}", flush=True)
+            print(f"[ClientStream] Usage: {duration_seconds:.1f}s = ${cost:.4f}", flush=True)
         
-        # Close Deepgram connection (async)
         if self.connection:
             try:
-                await asyncio.wait_for(
-                    self.connection.finish(),
-                    timeout=3.0
-                )
-                print(f"[TelnyxStream] Deepgram connection closed", flush=True)
-            except Exception as e:
-                logger.error(f"[TelnyxStream] Error closing Deepgram: {e}")
-            finally:
-                self.connection = None
+                await asyncio.wait_for(self.connection.finish(), timeout=3.0)
+            except:
+                pass
         
-        # Notify frontend
-        await self._broadcast_to_frontend({
-            "type": "stream_ended"
-        })
+        await self._broadcast({"type": "stream_ended"})
 
 
-# Active stream handlers
-_active_handlers: Dict[str, TelnyxStreamHandler] = {}
+class AgentStreamHandler:
+    """
+    Handles AGENT audio - recording only, NO Deepgram.
+    """
+    
+    def __init__(self, session_id: str):
+        self.session_id = session_id
+        self.is_running = False
+        self._total_audio_bytes = 0
+        logger.info(f"[AgentStream] Created for session {session_id}")
+    
+    async def start(self) -> bool:
+        print(f"[AgentStream] Starting for {self.session_id} (recording only)", flush=True)
+        self.is_running = True
+        return True
+    
+    async def handle_telnyx_message(self, message: dict):
+        """Handle agent audio - recording only"""
+        event = message.get("event")
+        
+        if event == "connected":
+            print(f"[AgentStream] Connected", flush=True)
+        elif event == "media":
+            media = message.get("media", {})
+            payload = media.get("payload")
+            if payload:
+                self._total_audio_bytes += len(base64.b64decode(payload))
+        elif event == "stop":
+            await self.stop()
+    
+    async def stop(self):
+        print(f"[AgentStream] Stopped - {self._total_audio_bytes} bytes", flush=True)
+        self.is_running = False
 
 
-async def get_or_create_handler(session_id: str) -> TelnyxStreamHandler:
-    """Get existing handler or create new one for session"""
-    if session_id not in _active_handlers:
-        handler = TelnyxStreamHandler(session_id)
+# Handler management
+_client_handlers: Dict[str, ClientStreamHandler] = {}
+_agent_handlers: Dict[str, AgentStreamHandler] = {}
+
+
+async def get_or_create_client_handler(session_id: str) -> ClientStreamHandler:
+    """Get or create client stream handler"""
+    if session_id not in _client_handlers:
+        handler = ClientStreamHandler(session_id)
         if await handler.start():
-            _active_handlers[session_id] = handler
+            _client_handlers[session_id] = handler
         else:
-            raise Exception("Failed to start stream handler")
-    return _active_handlers[session_id]
+            raise Exception("Failed to start client handler")
+    return _client_handlers[session_id]
+
+
+async def get_or_create_agent_handler(session_id: str) -> AgentStreamHandler:
+    """Get or create agent stream handler"""
+    if session_id not in _agent_handlers:
+        handler = AgentStreamHandler(session_id)
+        if await handler.start():
+            _agent_handlers[session_id] = handler
+        else:
+            raise Exception("Failed to start agent handler")
+    return _agent_handlers[session_id]
 
 
 async def remove_handler(session_id: str):
-    """Remove and stop handler for session"""
-    if session_id in _active_handlers:
-        handler = _active_handlers.pop(session_id)
+    """Remove handlers for session"""
+    if session_id in _client_handlers:
+        handler = _client_handlers.pop(session_id)
+        await handler.stop()
+    if session_id in _agent_handlers:
+        handler = _agent_handlers.pop(session_id)
         await handler.stop()

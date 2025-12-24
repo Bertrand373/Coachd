@@ -1,6 +1,6 @@
 """
 Coachd.ai - Real-time AI Sales Assistant
-Main FastAPI Application with Telnyx Bridge Integration
+Main FastAPI Application with Dual-Channel Click-to-Call
 """
 
 import os
@@ -26,11 +26,15 @@ from .document_processor import DocumentProcessor
 from .rag_engine import RAGEngine, CallContext
 from .websocket_handler import websocket_endpoint
 
-# Telnyx - simplified import
+# Telnyx dual-channel
 from .telnyx_bridge import is_telnyx_configured
 from .telnyx_routes import router as telnyx_router
 from .call_session import session_manager, CallStatus
-from .telnyx_stream_handler import get_or_create_handler, remove_handler
+from .telnyx_stream_handler import (
+    get_or_create_client_handler,
+    get_or_create_agent_handler,
+    remove_handler
+)
 
 # Database and usage tracking
 from .database import (
@@ -87,35 +91,31 @@ async def lifespan(app: FastAPI):
     print("🏈 Coachd.ai Starting Up...")
     print("="*50)
     
-    # Initialize vector DB
     db = get_vector_db()
     print(f"✓ Vector database initialized ({db.get_document_count()} chunks)")
     
-    # Initialize PostgreSQL database
     if is_db_configured():
         init_db()
-        print("✓ PostgreSQL database initialized (usage tracking active)")
+        print("✓ PostgreSQL database initialized")
     else:
         print("⚠ DATABASE_URL not set - usage tracking disabled")
     
-    # Check API keys
     if settings.anthropic_api_key:
         print("✓ Anthropic API key configured")
     else:
-        print("⚠ ANTHROPIC_API_KEY not set - AI features disabled")
+        print("⚠ ANTHROPIC_API_KEY not set")
     
     if settings.deepgram_api_key:
         print("✓ Deepgram API key configured")
     else:
-        print("⚠ DEEPGRAM_API_KEY not set - transcription disabled")
+        print("⚠ DEEPGRAM_API_KEY not set")
     
-    # Check Telnyx
     if is_telnyx_configured():
-        print("✓ Telnyx configured - 3-way bridge ACTIVE")
+        print("✓ Telnyx configured - DUAL-CHANNEL CLICK-TO-CALL ACTIVE")
         print(f"  Phone: {settings.telnyx_phone_number}")
         print(f"  Webhooks: {settings.base_url}/api/telnyx/")
     else:
-        print("⚠ Telnyx not configured - using browser mic mode")
+        print("⚠ Telnyx not configured")
     
     print("\n" + "="*50)
     print("✅ Coachd.ai Ready")
@@ -132,7 +132,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Coachd.ai",
     description="Real-time AI sales assistant for life insurance agents",
-    version="2.5.0",  # Version bump for Telnyx TeXML migration
+    version="3.0.0",  # Dual-channel click-to-call
     lifespan=lifespan
 )
 
@@ -144,7 +144,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files and templates
 static_path = Path(__file__).parent.parent / "static"
 templates_path = Path(__file__).parent.parent / "templates"
 
@@ -153,23 +152,22 @@ if static_path.exists():
 
 templates = Jinja2Templates(directory=str(templates_path))
 
-# Include routers
 app.include_router(outcome_router)
 app.include_router(status_router)
-app.include_router(telnyx_router)  # All /api/telnyx/* routes
+app.include_router(telnyx_router)
 
 
 # ============ WEBSOCKET ROUTES ============
 
 @app.websocket("/ws/{client_id}")
 async def websocket_route(websocket: WebSocket, client_id: str):
-    """WebSocket endpoint for real-time transcription (browser mic mode)"""
+    """WebSocket for browser mic mode"""
     await websocket_endpoint(websocket, client_id)
 
 
 @app.websocket("/ws/telnyx/session/{session_id}")
 async def telnyx_session_websocket(websocket: WebSocket, session_id: str):
-    """WebSocket for real-time updates from Telnyx calls"""
+    """WebSocket for frontend to receive real-time updates"""
     await websocket.accept()
     
     session = await session_manager.get_session(session_id)
@@ -180,13 +178,11 @@ async def telnyx_session_websocket(websocket: WebSocket, session_id: str):
     await session_manager.register_websocket(session_id, websocket)
     
     try:
-        # Send current state
         await websocket.send_json({
             "type": "session_state",
             "data": session.to_dict()
         })
         
-        # Keep connection alive
         while True:
             try:
                 message = await websocket.receive_text()
@@ -201,118 +197,132 @@ async def telnyx_session_websocket(websocket: WebSocket, session_id: str):
         await session_manager.unregister_websocket(session_id, websocket)
 
 
-@app.websocket("/ws/telnyx/stream/{session_id}")
-async def telnyx_stream_websocket(websocket: WebSocket, session_id: str):
+@app.websocket("/ws/telnyx/stream/client/{session_id}")
+async def telnyx_client_stream(websocket: WebSocket, session_id: str):
     """
-    WebSocket endpoint for receiving Telnyx media streams.
-    Telnyx sends audio here, we process through Deepgram with diarization,
-    and broadcast transcripts + guidance to the frontend session WebSocket.
+    CLIENT audio stream - 100% client audio.
+    Sent to Deepgram for transcription and guidance triggers.
     """
     await websocket.accept()
-    print(f"[TelnyxStream] WebSocket accepted for session {session_id}", flush=True)
+    print(f"[ClientStream] WebSocket accepted: {session_id}", flush=True)
     
     handler = None
     message_count = 0
     
     try:
-        # Get or create stream handler for this session
-        try:
-            handler = await get_or_create_handler(session_id)
-            print(f"[TelnyxStream] Handler created successfully", flush=True)
-        except Exception as e:
-            print(f"[TelnyxStream] Failed to create handler: {e}", flush=True)
-            handler = None
-        
-        # Update session status
+        handler = await get_or_create_client_handler(session_id)
         await session_manager.update_session(session_id, status=CallStatus.IN_PROGRESS)
         
-        # Process incoming messages from Telnyx
-        print(f"[TelnyxStream] Waiting for messages from Telnyx...", flush=True)
         while True:
             try:
-                # Try to receive - could be text or bytes
                 message = await websocket.receive()
                 message_count += 1
                 
-                if message_count <= 5:
-                    print(f"[TelnyxStream] Message #{message_count} type: {message.get('type')}", flush=True)
+                if message_count <= 3:
+                    print(f"[ClientStream] Msg #{message_count}", flush=True)
                 
                 if "text" in message:
                     data = json.loads(message["text"])
-                    if message_count <= 5:
-                        print(f"[TelnyxStream] Message #{message_count} event: {data.get('event')}", flush=True)
-                    if handler:
-                        await handler.handle_telnyx_message(data)
+                    await handler.handle_telnyx_message(data)
                 elif "bytes" in message:
-                    if message_count <= 3:
-                        print(f"[TelnyxStream] Received binary message: {len(message['bytes'])} bytes", flush=True)
-                    # Telnyx might send binary directly
-                    if handler and handler.connection:
-                        handler.connection.send(message["bytes"])
+                    if handler.connection:
+                        await handler.connection.send(message["bytes"])
                 elif message.get("type") == "websocket.disconnect":
-                    print(f"[TelnyxStream] Received disconnect message", flush=True)
                     break
                     
-            except json.JSONDecodeError as e:
-                print(f"[TelnyxStream] Invalid JSON: {e}", flush=True)
+            except json.JSONDecodeError:
                 continue
                 
     except Exception as e:
-        print(f"[TelnyxStream] WebSocket error: {e}", flush=True)
-        import traceback
-        traceback.print_exc()
+        print(f"[ClientStream] Error: {e}", flush=True)
         
     finally:
-        print(f"[TelnyxStream] WebSocket disconnected. Total messages received: {message_count}", flush=True)
+        print(f"[ClientStream] Disconnected. Messages: {message_count}", flush=True)
         if handler:
-            await remove_handler(session_id)
+            await handler.stop()
+
+
+@app.websocket("/ws/telnyx/stream/agent/{session_id}")
+async def telnyx_agent_stream(websocket: WebSocket, session_id: str):
+    """
+    AGENT audio stream - 100% agent audio.
+    Recording only, NOT sent to Deepgram.
+    """
+    await websocket.accept()
+    print(f"[AgentStream] WebSocket accepted: {session_id}", flush=True)
+    
+    handler = None
+    message_count = 0
+    
+    try:
+        handler = await get_or_create_agent_handler(session_id)
+        
+        while True:
+            try:
+                message = await websocket.receive()
+                message_count += 1
+                
+                if "text" in message:
+                    data = json.loads(message["text"])
+                    await handler.handle_telnyx_message(data)
+                elif message.get("type") == "websocket.disconnect":
+                    break
+                    
+            except json.JSONDecodeError:
+                continue
+                
+    except Exception as e:
+        print(f"[AgentStream] Error: {e}", flush=True)
+        
+    finally:
+        print(f"[AgentStream] Disconnected. Messages: {message_count}", flush=True)
+        if handler:
+            await handler.stop()
 
 
 # ============ PAGE ROUTES ============
 
 @app.get("/", response_class=HTMLResponse)
 async def agent_home(request: Request):
-    """Main agent entry point - agency code + context form"""
+    """Main agent entry point"""
     return templates.TemplateResponse("agent.html", {"request": request})
 
 
 @app.get("/chat", response_class=HTMLResponse)
 async def chat_page(request: Request):
-    """Chat interface for agent Q&A"""
+    """Chat interface"""
     return templates.TemplateResponse("chat.html", {"request": request})
 
 
 @app.get("/call", response_class=HTMLResponse)
 async def call_page(request: Request):
-    """Live call interface - auto-selects best mode"""
-    # If Telnyx is configured, use Telnyx mode
+    """Live call interface"""
     if is_telnyx_configured():
         return templates.TemplateResponse("call_telnyx.html", {"request": request})
-    # Otherwise fall back to browser mic mode
     return templates.TemplateResponse("call_new.html", {"request": request})
 
 
 @app.get("/call/browser", response_class=HTMLResponse)
 async def call_browser_page(request: Request):
-    """Browser mic mode (legacy/fallback)"""
+    """Browser mic mode"""
     return templates.TemplateResponse("call_new.html", {"request": request})
 
 
 @app.get("/call/telnyx", response_class=HTMLResponse)
 async def call_telnyx_page(request: Request):
-    """Telnyx 3-way bridge mode (explicit)"""
+    """Telnyx click-to-call mode"""
     return templates.TemplateResponse("call_telnyx.html", {"request": request})
 
 
 @app.get("/call/test", response_class=HTMLResponse)
 async def call_test_page(request: Request):
-    """Browser mic test page with outcome tracking"""
+    """Test page"""
     return templates.TemplateResponse("call_new.html", {"request": request})
 
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
-    """Admin dashboard for document management"""
+    """Admin dashboard"""
     db = get_vector_db()
     
     agency_docs = {}
@@ -332,25 +342,22 @@ async def admin_page(request: Request):
 
 @app.get("/platform-admin", response_class=HTMLResponse)
 async def platform_admin_page(request: Request):
-    """Platform admin dashboard for usage and cost tracking"""
+    """Platform admin dashboard"""
     return templates.TemplateResponse("platform_admin.html", {"request": request})
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_redirect(request: Request):
-    """Redirect old dashboard to admin"""
     return RedirectResponse(url="/admin")
 
 
 @app.get("/privacy", response_class=HTMLResponse)
 async def privacy_page(request: Request):
-    """Privacy policy page"""
     return templates.TemplateResponse("privacy.html", {"request": request})
 
 
 @app.get("/terms", response_class=HTMLResponse)
 async def terms_page(request: Request):
-    """Terms of service page"""
     return templates.TemplateResponse("terms.html", {"request": request})
 
 
@@ -358,11 +365,10 @@ async def terms_page(request: Request):
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for load balancers"""
     return {
         "status": "healthy",
         "app": settings.app_name,
-        "version": "2.5.0",
+        "version": "3.0.0",
         "database": is_db_configured(),
         "telnyx": is_telnyx_configured()
     }
@@ -372,7 +378,6 @@ async def health_check():
 
 @app.get("/api/platform/summary")
 async def platform_summary():
-    """Get complete platform usage summary"""
     if not is_db_configured():
         return {
             "internal": {"by_service": {}, "by_agency": {}, "total_cost": 0},
@@ -388,7 +393,6 @@ async def platform_summary():
 
 @app.get("/api/platform/usage")
 async def platform_usage(days: int = 30, agency: Optional[str] = None):
-    """Get usage summary"""
     if not is_db_configured():
         return {"error": "Database not configured", "data": {}}
     
@@ -401,7 +405,6 @@ async def platform_usage(days: int = 30, agency: Optional[str] = None):
 
 @app.get("/api/platform/logs")
 async def platform_logs(limit: int = 100, agency: Optional[str] = None):
-    """Get recent usage logs"""
     if not is_db_configured():
         return {"error": "Database not configured", "logs": []}
     
@@ -410,15 +413,25 @@ async def platform_logs(limit: int = 100, agency: Optional[str] = None):
 
 @app.get("/api/platform/external")
 async def platform_external():
-    """Fetch fresh data from external service APIs"""
     return fetch_all_external_usage()
 
 
 # ============ AGENCY VALIDATION ============
 
+@app.get("/api/agencies")
+async def list_agencies():
+    """List all active agencies"""
+    return {
+        "agencies": [
+            {"code": code, "name": data["name"]}
+            for code, data in AGENCIES.items()
+            if data["active"]
+        ]
+    }
+
+
 @app.post("/api/agency/validate")
 async def validate_agency(data: AgencyValidation):
-    """Validate an agency code"""
     code = data.code.strip().upper()
     
     if code in AGENCIES and AGENCIES[code]["active"]:
@@ -435,7 +448,7 @@ async def validate_agency(data: AgencyValidation):
 
 @app.post("/api/chat")
 async def chat_endpoint(data: ChatRequest):
-    """Process a chat message and return AI response (non-streaming)"""
+    """Chat message (non-streaming)"""
     
     if not settings.anthropic_api_key:
         raise HTTPException(status_code=503, detail="AI service not configured")
@@ -443,7 +456,6 @@ async def chat_endpoint(data: ChatRequest):
     try:
         engine = RAGEngine()
         
-        # Build context from client profile
         context = data.context or {}
         client_info = []
         if context.get("name"):
@@ -498,7 +510,6 @@ Bold **key phrases** the agent should say out loud."""
             messages=messages
         )
         
-        # Log Claude usage
         log_claude_usage(
             input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,
@@ -521,7 +532,7 @@ Bold **key phrases** the agent should say out loud."""
 
 @app.post("/api/chat/stream")
 async def chat_stream_endpoint(data: ChatRequest):
-    """Process a chat message and stream the AI response"""
+    """Chat message (streaming)"""
     
     if not settings.anthropic_api_key:
         raise HTTPException(status_code=503, detail="AI service not configured")
@@ -531,7 +542,6 @@ async def chat_stream_endpoint(data: ChatRequest):
             import anthropic
             client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
             
-            # Build context
             context = data.context or {}
             client_info = []
             if context.get("name"):
@@ -580,7 +590,6 @@ Match your response to what the question actually requires. No filler, no fluff,
 
 Bold **key phrases** the agent should say out loud."""
 
-            # Use synchronous streaming in a thread
             usage_info = {'input': 0, 'output': 0}
             loop = asyncio.get_event_loop()
             chunk_queue = asyncio.Queue()
@@ -611,11 +620,9 @@ Bold **key phrases** the agent should say out loud."""
                         chunk_queue.put(('error', str(e))), loop
                     )
             
-            # Start Claude streaming in background thread
             thread = threading.Thread(target=stream_claude, daemon=True)
             thread.start()
             
-            # Yield chunks as they arrive from the queue
             while True:
                 msg_type, content = await chunk_queue.get()
                 
@@ -627,7 +634,6 @@ Bold **key phrases** the agent should say out loud."""
                     yield f"data: {json.dumps({'error': content})}\n\n"
                     break
             
-            # Log usage
             if usage_info['input'] or usage_info['output']:
                 log_claude_usage(
                     input_tokens=usage_info['input'],
@@ -656,7 +662,7 @@ Bold **key phrases** the agent should say out loud."""
 
 # ============ DOCUMENT MANAGEMENT ============
 
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+MAX_FILE_SIZE = 50 * 1024 * 1024
 
 @app.post("/api/documents/upload")
 async def upload_document(
@@ -664,7 +670,7 @@ async def upload_document(
     category: str = Form("general"),
     agency: str = Form("ADERHOLT")
 ):
-    """Upload and process a document for a specific agency"""
+    """Upload and process a document"""
     
     agency = agency.upper()
     if agency not in AGENCIES:
@@ -698,7 +704,6 @@ async def upload_document(
     file_path = Path(settings.documents_dir) / file.filename
     
     try:
-        # Ensure directory exists
         file_path.parent.mkdir(parents=True, exist_ok=True)
         
         with open(file_path, "wb") as buffer:
@@ -732,7 +737,7 @@ async def upload_document(
 
 @app.get("/api/documents")
 async def list_documents(agency: Optional[str] = None):
-    """List all documents in an agency's knowledge base"""
+    """List documents"""
     db = get_vector_db()
     
     if agency:
@@ -754,7 +759,7 @@ async def list_documents(agency: Optional[str] = None):
 
 @app.delete("/api/documents/{document_id}")
 async def delete_document(document_id: str, agency: str = "ADERHOLT"):
-    """Delete a document from an agency's knowledge base"""
+    """Delete a document"""
     agency = agency.upper()
     if agency not in AGENCIES:
         raise HTTPException(status_code=400, detail=f"Invalid agency: {agency}")
@@ -777,7 +782,7 @@ async def delete_document(document_id: str, agency: str = "ADERHOLT"):
 
 @app.post("/api/search")
 async def search_knowledge(data: SearchRequest):
-    """Search an agency's knowledge base"""
+    """Search knowledge base"""
     db = get_vector_db()
     
     agency = getattr(data, 'agency', None)
@@ -799,7 +804,7 @@ async def search_knowledge(data: SearchRequest):
 
 @app.post("/api/query")
 async def query_ai(data: QueryRequest):
-    """Query the AI with RAG context"""
+    """Query AI with RAG context"""
     
     if not settings.anthropic_api_key:
         raise HTTPException(status_code=503, detail="AI service not configured")
