@@ -147,40 +147,39 @@ PHONE_SCRIPTS = {
 
 
 # =============================================================================
-# CONTEXT EXTRACTION PROMPT
+# CONTEXT EXTRACTION PROMPT - BUILD ON THE SCRIPT, DON'T JUST FILL BLANKS
 # =============================================================================
 
-CONTEXTUALIZE_PROMPT = """You are filling in a Globe Life sales script with context from the conversation.
+CONTEXTUALIZE_PROMPT = """You are a senior Globe Life sales closer helping a new agent in real-time.
 
-SCRIPT TEMPLATE:
+THE CLIENT JUST RAISED THIS OBJECTION. Help the agent close.
+
+GLOBE LIFE SCRIPT (use as your FOUNDATION):
 {template}
 
-TRANSCRIPT CONTEXT:
+CONVERSATION SO FAR:
 {transcript}
 
-YOUR TASK:
-Fill in these context slots based on the transcript. If you can't find specific info, use the generic fallback shown.
+YOUR JOB:
+The script above is the framework. Now BUILD on it to close THIS specific person.
 
-SLOTS TO FILL:
-- {{family_reference}} = Client's family (e.g., "Maria and the kids", "your family")
-- {{family_possessive}} = Possessive form (e.g., "your family's", "Maria and the kids'")
-- {{spouse_name}} = Spouse's name if mentioned (e.g., "David", "your wife")
-- {{children_reference}} = Children reference (e.g., "Tyler and Sofia", "your children")
-- {{client_names}} = Client name(s) (e.g., "Nate and Julie", "Maria")
-- {{context_acknowledgment}} = Brief acknowledgment of something they said (e.g., ", especially with the holidays coming up" or leave empty)
-- {{existing_coverage_reference}} = Reference to their existing coverage if mentioned (e.g., "through your job at Amazon")
-- {{income_earner_possessive}} = Primary earner's possessive (e.g., "David's", "your")
-- {{personalized_hook}} = A question based on what they've shared (e.g., "With David working nights at the warehouse, would Maria be able to handle things financially?")
-- {{down_close_amount}} = Keep as shown in template
+1. FLIP THE OBJECTION - Whatever they said is tight/hard/expensive → that's EXACTLY why they need coverage. "You can't afford it? You can't afford NOT to have it."
 
-RULES:
-1. NEVER change the script structure or key phrases
-2. Only fill in the context slots
-3. If no specific context found for a slot, use natural generic language
-4. Keep acknowledgments brief (under 10 words)
-5. Output ONLY the completed script, nothing else
+2. USE THEIR SPECIFICS - If they mentioned kids, holidays, bills, job, health, spouse → reference those EXACT things. "You said you have 3 kids counting on you..."
 
-COMPLETED SCRIPT:"""
+3. PAINT THE PICTURE - What happens to their family WITHOUT this coverage? Make it real. "If something happens to you during the holidays, those kids have nothing."
+
+4. CLOSE TODAY - Always pivot to getting SOMETHING in place now. "Let's get you covered today, and we can add more after the holidays."
+
+5. KEEP IT CONVERSATIONAL - This isn't a script they read robotically. It's what they SAY to a real person sitting in front of them.
+
+OUTPUT RULES:
+- Start with the script's core message, then expand with their specific situation
+- 3-5 sentences max - they need to say this NOW, not read an essay
+- Sound like a human talking, not a document
+- End with a soft close or question that moves toward yes
+
+WHAT THE AGENT SHOULD SAY:"""
 
 
 def get_script(objection_type: str, down_close_level: int = 0) -> dict:

@@ -863,10 +863,13 @@ Respond in JSON format:
         session_id: Optional[str] = None
     ) -> Generator[str, None, None]:
         """
-        Contextualize a Globe Life script using Sonnet.
+        Build on a Globe Life script using Sonnet.
         
-        Takes the locked script template and fills in context slots
-        based on the transcript. Never changes the script structure.
+        The script is the FOUNDATION - Claude builds on it with:
+        - Flipping objections into reasons to buy
+        - Referencing specific things the client mentioned
+        - Painting the picture of what happens without coverage
+        - Always pivoting to closing today
         
         Args:
             objection_type: Type of objection (price, stall, covered, spouse)
@@ -876,35 +879,37 @@ Respond in JSON format:
             session_id: Session ID for usage tracking
         
         Yields:
-            Contextualized script tokens
+            Closing script tokens
         """
         from .globe_life_scripts import get_script, CONTEXTUALIZE_PROMPT
         
-        # Get the locked script template
+        # Get the script template as foundation
         script_data = get_script(objection_type, down_close_level)
         template = script_data.get("template", "")
         fallback = script_data.get("fallback", template)
         
-        # If template is same as fallback (no context slots), just return fallback
-        if template == fallback or "{" not in template:
+        # If no transcript context, just return the fallback
+        # (Agent can deliver the standard script)
+        if not transcript or len(transcript.strip()) < 50:
+            print(f"[RAG] No transcript context, using fallback script", flush=True)
             yield fallback
             return
         
-        # Build the contextualization prompt
+        # Build the prompt - Claude will BUILD on the script, not just fill blanks
         prompt = CONTEXTUALIZE_PROMPT.format(
             template=template,
-            transcript=transcript[-4000:]  # Last 4k chars for context
+            transcript=transcript[-6000:]  # Last 6k chars for richer context
         )
         
         messages = [{"role": "user", "content": prompt}]
         
-        # Use Sonnet for quality contextualization
+        # Use Sonnet for quality - this is where the magic happens
         model = settings.claude_model
         
         try:
             with self.client.messages.stream(
                 model=model,
-                max_tokens=500,
+                max_tokens=700,  # Room to build, but keep it readable
                 messages=messages
             ) as stream:
                 for text in stream.text_stream:

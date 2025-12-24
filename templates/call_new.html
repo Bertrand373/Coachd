@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>Coachd.ai | Live Call</title>
-    <!-- VERSION: 2025-12-24-v7-auto-detection-only -->
+    <!-- VERSION: 2025-12-24-v8-ai-builds-to-close -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -620,6 +620,13 @@
             color: var(--accent-dark);
             animation: loadingPulse 1.2s ease-in-out infinite;
             margin-left: 8px;
+        }
+        
+        .guidance-loading {
+            font-size: 2rem;
+            color: var(--accent);
+            animation: loadingPulse 1.2s ease-in-out infinite;
+            letter-spacing: 8px;
         }
         
         @keyframes loadingPulse {
@@ -2394,20 +2401,14 @@
         
         // ==================== GUIDANCE ====================
         function handleBridge(msg) {
-            // Bridge is optional - agents can naturally say "I understand..." themselves
-            // If backend sends one, show it briefly, but guidance will overwrite immediately
-            const text = msg.text || '';
-            console.log('[BRIDGE] Received:', text || '(empty)');
+            // Show loading indicator - agents bridge naturally with their voice
+            console.log('[BRIDGE] Objection detected, showing loading indicator');
             
-            if (!text) return;
-            
-            // Show bridge with loading indicator (will be overwritten by guidance)
             dom.listeningState.style.display = 'none';
             dom.teleprompter.classList.add('has-guidance');
-            dom.guidanceText.innerHTML = `<span class="bridge-text">${text}</span><span class="loading-dots"> ● ● ●</span>`;
+            dom.guidanceText.innerHTML = '<div class="guidance-loading">●  ●  ●</div>';
             dom.guidanceState.classList.add('active');
             
-            // Notification
             playNotify();
             if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
             state.hasVibratedForCurrentGuidance = true;
