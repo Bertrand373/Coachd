@@ -70,6 +70,7 @@
             height: 100dvh;
             padding-top: var(--safe-top);
             padding-bottom: var(--safe-bottom);
+            overflow: hidden;  /* Establish scroll boundary */
         }
         
         /* ========== HEADER ========== */
@@ -209,6 +210,8 @@
             display: none;
             flex: 1;
             flex-direction: column;
+            min-height: 0;  /* Allow screen to be constrained by parent */
+            overflow: hidden;
         }
         
         .screen.active { display: flex; }
@@ -474,10 +477,20 @@
         .change-agent:hover { color: var(--text-secondary); }
         
         /* ========== CALL SCREEN ========== */
-        .call-screen { position: relative; }
+        .call-screen { 
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* GRID LAYOUT only when active - more reliable than flex for scrollable content */
+        .call-screen.active {
+            display: grid;
+            grid-template-rows: 1fr auto auto auto;  /* teleprompter | price-btn | captions | footer */
+            grid-template-columns: 1fr;
+        }
         
         .teleprompter {
-            flex: 1;
+            /* Grid child - takes the 1fr row */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -486,13 +499,11 @@
             text-align: center;
             cursor: pointer;
             transition: background 0.2s;
-            /* iOS Safari scroll fix */
-            height: 0;  /* Force flex to calculate height properly */
+            /* CRITICAL: These 3 properties enable scrolling in grid */
             min-height: 0;
             overflow-y: auto;
             overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
-            position: relative;  /* Establish scroll context */
         }
         
         /* When guidance is showing, start from top so user can scroll */
