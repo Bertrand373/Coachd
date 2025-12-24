@@ -373,9 +373,10 @@ class RealtimeTranscriber:
                                     self.state_machine.add_transcript(transcript, is_final=True)
                             return
                         
-                        # Check for trigger keywords on BOTH interim AND final
-                        # This lets us react MID-SENTENCE to objections
-                        self._check_for_guidance_trigger(transcript, is_final)
+                        # Only check for objections on FINAL transcripts
+                        # This prevents double-triggering mid-sentence
+                        if is_final:
+                            self._check_for_guidance_trigger(transcript, is_final)
                         
                         # Buffer final transcripts for context
                         if is_final:

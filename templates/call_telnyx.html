@@ -636,10 +636,13 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            width: 100%;
+            max-width: 100%;
             padding: 24px;
             text-align: center;
             cursor: pointer;
             transition: background 0.2s;
+            box-sizing: border-box;
             /* CRITICAL: These 3 properties enable scrolling in grid */
             min-height: 0;
             overflow-y: auto;
@@ -659,6 +662,8 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            width: 100%;
+            max-width: 100%;
         }
         
         .listening-bars {
@@ -708,8 +713,9 @@
             align-items: center;
             width: 100%;
             max-width: 900px;  /* Wider for desktop readability */
-            padding-bottom: 40px;
+            padding: 0 16px 40px 16px;  /* Side padding prevents edge cutoff */
             flex-shrink: 0;  /* iOS fix: prevent collapse */
+            box-sizing: border-box;
         }
         
         .guidance-state.active { 
@@ -729,12 +735,16 @@
         }
         
         .guidance-text {
+            width: 100%;
+            max-width: 100%;
             font-size: 1.5rem;
             line-height: 1.55;
             font-weight: 500;
             color: var(--text);
             text-align: center;
             margin-bottom: 32px;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
         }
         
         /* Bold key phrases for quick scanning */
