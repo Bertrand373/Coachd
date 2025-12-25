@@ -93,23 +93,21 @@ class ClaudeAnalyzer:
         self.client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key) if settings.anthropic_api_key else None
         self.last_analysis_time = 0
         self.is_analyzing = False
-        self._rag_context = None
     
-    def _get_rag_context(self) -> str:
-        """Get relevant training materials"""
-        if self._rag_context is None:
-            try:
-                db = get_vector_db()
-                results = db.search(
-                    "objection handling rebuttals price spouse think about it",
-                    top_k=5,
-                    agency=self.agency
-                )
-                self._rag_context = "\n\n".join([r["content"] for r in results])
-            except Exception as e:
-                logger.error(f"RAG context error: {e}")
-                self._rag_context = ""
-        return self._rag_context
+    def _get_relevant_training(self, client_text: str) -> str:
+        """Dynamically search training materials based on what client said"""
+        try:
+            db = get_vector_db()
+            # Search using the actual client statement
+            results = db.search(
+                client_text,
+                top_k=5,
+                agency=self.agency
+            )
+            return "\n\n".join([r["content"] for r in results])
+        except Exception as e:
+            logger.error(f"RAG search error: {e}")
+            return ""
     
     async def should_analyze(self, client_text: str) -> bool:
         """Check if we should run analysis"""
@@ -135,12 +133,12 @@ class ClaudeAnalyzer:
         
         try:
             context = conversation.get_context()
-            training_materials = self._get_rag_context()
+            training_materials = self._get_relevant_training(client_text)
             
             prompt = f"""You are a live sales coach for a Globe Life insurance agent on an active call.
 
-TRAINING MATERIALS:
-{training_materials[:2000] if training_materials else "Standard insurance sales techniques."}
+RELEVANT TRAINING MATERIALS:
+{training_materials[:3000] if training_materials else "Use standard insurance sales techniques."}
 
 CONVERSATION SO FAR:
 {context}
@@ -156,7 +154,7 @@ Consider:
 - Is this just NORMAL conversation flow?
 
 RESPOND WITH EXACTLY ONE OF:
-1. If guidance needed: The exact words the agent should say. Be conversational, not scripted. 2-3 sentences max.
+1. If guidance needed: The exact words the agent should say. Be conversational, not scripted. 2-3 sentences max. Use the training materials as your guide.
 2. If no guidance needed: Just the word NO_GUIDANCE_NEEDED
 
 Do not explain your reasoning. Just give the guidance or NO_GUIDANCE_NEEDED."""
@@ -202,19 +200,19 @@ Do not explain your reasoning. Just give the guidance or NO_GUIDANCE_NEEDED."""
         
         try:
             context = conversation.get_context()
-            training_materials = self._get_rag_context()
+            training_materials = self._get_relevant_training(client_text)
             
             prompt = f"""You are a live sales coach for a Globe Life insurance agent on an active call.
 
-TRAINING MATERIALS:
-{training_materials[:2000] if training_materials else "Standard insurance sales techniques."}
+RELEVANT TRAINING MATERIALS:
+{training_materials[:3000] if training_materials else "Use standard insurance sales techniques."}
 
 CONVERSATION SO FAR:
 {context}
 
 CLIENT JUST SAID: "{client_text}"
 
-If the agent needs guidance right now (objection, buying signal, confusion), give them the exact words to say. 2-3 sentences, conversational.
+If the agent needs guidance right now (objection, buying signal, confusion), give them the exact words to say. 2-3 sentences, conversational. Use the training materials as your guide.
 
 If no guidance needed, respond only with: NO_GUIDANCE_NEEDED"""
 

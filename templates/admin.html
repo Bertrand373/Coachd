@@ -351,90 +351,6 @@
             overflow-y: auto;
         }
         
-        /* System Document - Proven Rebuttals */
-        .system-doc {
-            display: grid;
-            grid-template-columns: 40px 1fr auto;
-            align-items: center;
-            gap: 12px;
-            padding: 12px;
-            margin-bottom: 8px;
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%);
-            border: 1px solid rgba(245, 158, 11, 0.12);
-            border-radius: var(--radius-md);
-        }
-        
-        .system-doc-icon {
-            width: 40px;
-            height: 40px;
-            background: rgba(245, 158, 11, 0.1);
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #B45309;
-            flex-shrink: 0;
-        }
-        
-        .system-doc-content {
-            min-width: 0;
-        }
-        
-        .system-doc-header {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        
-        .system-doc-title {
-            font-weight: 600;
-            font-size: 0.875rem;
-            color: var(--color-text);
-        }
-        
-        .system-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 3px;
-            padding: 2px 6px;
-            background: rgba(245, 158, 11, 0.1);
-            border-radius: var(--radius-full);
-            font-size: 0.625rem;
-            font-weight: 600;
-            color: #B45309;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-        }
-        
-        .system-badge svg {
-            width: 8px;
-            height: 8px;
-        }
-        
-        .system-doc-meta {
-            font-size: 0.75rem;
-            color: var(--color-text-muted);
-            margin-top: 2px;
-        }
-        
-        .system-doc-stats {
-            text-align: right;
-            flex-shrink: 0;
-        }
-        
-        .system-stat-value {
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: #B45309;
-        }
-        
-        .system-stat-label {
-            font-size: 0.65rem;
-            color: var(--color-text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-        }
-        
         /* User Documents - Grid aligned */
         .doc-item {
             display: grid;
@@ -658,41 +574,6 @@
             background: var(--color-error);
             border-radius: 4px;
             transition: width 0.3s ease;
-        }
-        
-        /* ========== WINNING REBUTTALS ========== */
-        .rebuttal-item {
-            padding: 16px;
-            background: var(--color-bg);
-            border-radius: var(--radius-md);
-            margin-bottom: 12px;
-        }
-        
-        .rebuttal-item:last-child {
-            margin-bottom: 0;
-        }
-        
-        .rebuttal-rate {
-            display: inline-block;
-            padding: 4px 10px;
-            background: var(--color-accent-soft);
-            border-radius: var(--radius-full);
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--color-accent);
-            margin-bottom: 8px;
-        }
-        
-        .rebuttal-text {
-            font-size: 0.95rem;
-            line-height: 1.5;
-            color: var(--color-text);
-        }
-        
-        .rebuttal-meta {
-            font-size: 0.8rem;
-            color: var(--color-text-muted);
-            margin-top: 8px;
         }
         
         /* ========== REFRESH BTN ========== */
@@ -1114,7 +995,7 @@
                     <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
                     <path d="M14 2v6h6"/>
                 </svg>
-                Documents
+                AI Training
             </button>
             <button class="view-tab" onclick="switchView('performance')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1137,7 +1018,7 @@
                         </svg>
                     </div>
                     <div class="stat-value" id="docCount">0</div>
-                    <div class="stat-label">Documents</div>
+                    <div class="stat-label">Training Docs</div>
                 </div>
                 <div class="stat-card" id="apiStatusCard">
                     <div class="stat-icon accent">
@@ -1154,7 +1035,7 @@
             <div class="content-grid">
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Upload Documents</h2>
+                        <h2 class="card-title">Upload Training Documents</h2>
                     </div>
                     <div class="card-body">
                         <label class="upload-zone" id="uploadZone">
@@ -1267,25 +1148,6 @@
                     <div class="card-body">
                         <div id="objectionsChart">
                             <div class="empty-state">No objection data yet</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="card" style="grid-column: 1 / -1;">
-                    <div class="card-header">
-                        <h2 class="card-title">Winning Rebuttals</h2>
-                        <button class="btn-refresh" id="refreshRebuttalsBtn" onclick="refreshWinningRebuttals()">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M23 4v6h-6"/>
-                                <path d="M1 20v-6h6"/>
-                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-                            </svg>
-                            Refresh
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div id="winningRebuttals">
-                            <div class="empty-state">Winning rebuttals will appear after enough calls are tracked</div>
                         </div>
                     </div>
                 </div>
@@ -1443,37 +1305,8 @@
         function updateDocList(docs) {
             const container = document.getElementById('docList');
             
-            // System Document - always shows at top
-            const systemDocHTML = `
-                <div class="system-doc" id="systemDoc">
-                    <div class="system-doc-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
-                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                            <path d="M14 2v6h6"/>
-                        </svg>
-                    </div>
-                    <div class="system-doc-content">
-                        <div class="system-doc-header">
-                            <span class="system-doc-title">Proven Rebuttals</span>
-                            <span class="system-badge">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM9 8V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9z"/>
-                                </svg>
-                                System
-                            </span>
-                        </div>
-                        <div class="system-doc-meta" id="systemDocMeta">Loading...</div>
-                    </div>
-                    <div class="system-doc-stats" id="systemDocStats">
-                        <div class="system-stat-value" id="systemStatValue">—</div>
-                        <div class="system-stat-label" id="systemStatLabel">rebuttals</div>
-                    </div>
-                </div>
-            `;
-            
             if (!docs.length) {
-                container.innerHTML = systemDocHTML + '<div class="empty-state">No documents uploaded</div>';
-                loadSystemDocStats();
+                container.innerHTML = '<div class="empty-state">No training documents uploaded yet</div>';
                 return;
             }
             
@@ -1499,66 +1332,7 @@
                 </div>
             `).join('');
             
-            container.innerHTML = systemDocHTML + docsHTML;
-            loadSystemDocStats();
-        }
-        
-        // Load real stats for system document
-        async function loadSystemDocStats() {
-            const metaEl = document.getElementById('systemDocMeta');
-            const valueEl = document.getElementById('systemStatValue');
-            const labelEl = document.getElementById('systemStatLabel');
-            
-            try {
-                const pwd = await getAdminPassword();
-                const res = await fetch('/api/admin/winning-rebuttals/status', {
-                    headers: { 'X-Admin-Password': pwd }
-                });
-                
-                if (!res.ok) {
-                    metaEl.textContent = 'Learns from closed deals';
-                    valueEl.textContent = '—';
-                    labelEl.textContent = 'rebuttals';
-                    return;
-                }
-                
-                const data = await res.json();
-                const status = data.data || {};
-                
-                const totalOutcomes = status.total_outcomes || 0;
-                const docExists = status.document_exists || false;
-                const metadata = status.metadata || {};
-                const rebuttalCount = metadata.rebuttal_count || 0;
-                
-                // Show appropriate state
-                if (docExists && rebuttalCount > 0) {
-                    // Document exists with rebuttals
-                    valueEl.textContent = rebuttalCount;
-                    labelEl.textContent = rebuttalCount === 1 ? 'rebuttal' : 'rebuttals';
-                    metaEl.textContent = `From ${totalOutcomes} tracked calls`;
-                } else if (totalOutcomes >= 20) {
-                    // Enough data but no doc yet (needs refresh)
-                    valueEl.textContent = '!';
-                    labelEl.textContent = 'ready';
-                    metaEl.textContent = `${totalOutcomes} calls tracked • Refresh to generate`;
-                } else if (totalOutcomes > 0) {
-                    // Collecting data
-                    valueEl.textContent = totalOutcomes;
-                    labelEl.textContent = 'of 20';
-                    metaEl.textContent = 'Collecting call data...';
-                } else {
-                    // No data yet
-                    valueEl.textContent = '0';
-                    labelEl.textContent = 'calls';
-                    metaEl.textContent = 'Learns from closed deals';
-                }
-                
-            } catch (e) {
-                console.log('System doc stats not available');
-                metaEl.textContent = 'Learns from closed deals';
-                valueEl.textContent = '—';
-                labelEl.textContent = 'rebuttals';
-            }
+            container.innerHTML = docsHTML;
         }
         
         // ==================== DOCUMENT FUNCTIONS ====================
@@ -1770,8 +1544,7 @@
             await Promise.all([
                 loadAgencyStats(),
                 loadAgentLeaderboard(),
-                loadObjections(),
-                loadWinningRebuttals()
+                loadObjections()
             ]);
         }
         
@@ -1963,63 +1736,6 @@
                 
             } catch (e) {
                 console.error('Failed to load objections:', e);
-            }
-        }
-        
-        async function loadWinningRebuttals() {
-            try {
-                const pwd = await getAdminPassword();
-                const res = await fetch('/api/admin/winning-guidance?min_success=1', {
-                    headers: { 'X-Admin-Password': pwd }
-                });
-                
-                if (!res.ok) return;
-                
-                const data = await res.json();
-                const rebuttals = data.data?.winning_guidance || [];
-                
-                const container = document.getElementById('winningRebuttals');
-                
-                if (!rebuttals.length) {
-                    container.innerHTML = '<div class="empty-state">Winning rebuttals will appear after enough calls are tracked</div>';
-                    return;
-                }
-                
-                container.innerHTML = rebuttals.slice(0, 5).map(r => `
-                    <div class="rebuttal-item">
-                        <span class="rebuttal-rate">${r.success_rate}% close rate</span>
-                        <div class="rebuttal-text">"${r.text}"</div>
-                        <div class="rebuttal-meta">Used ${r.total_uses} times, led to ${r.success_count} closes</div>
-                    </div>
-                `).join('');
-                
-            } catch (e) {
-                console.error('Failed to load rebuttals:', e);
-            }
-        }
-        
-        async function refreshWinningRebuttals() {
-            const btn = document.getElementById('refreshRebuttalsBtn');
-            btn.classList.add('loading');
-            
-            try {
-                const pwd = await getAdminPassword();
-                const res = await fetch('/api/admin/winning-rebuttals/refresh', {
-                    method: 'POST',
-                    headers: { 'X-Admin-Password': pwd }
-                });
-                
-                if (res.ok) {
-                    showToast('Rebuttals refreshed', 'success');
-                    await loadWinningRebuttals();
-                } else {
-                    const data = await res.json();
-                    showToast(data.message || 'Refresh failed', 'error');
-                }
-            } catch (e) {
-                showToast('Refresh failed', 'error');
-            } finally {
-                btn.classList.remove('loading');
             }
         }
         

@@ -45,6 +45,10 @@
         
         /* Header */
         .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--bg);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -109,7 +113,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 24px;
+            padding: 40px 24px 24px 24px;
             overflow-y: auto;
             position: relative;
         }
@@ -145,32 +149,25 @@
         
         .listening-state.hidden { display: none; }
         
-        .listening-bars {
+        .waiting-cursor {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
             height: 48px;
             margin-bottom: 16px;
         }
         
-        .bar {
-            width: 4px;
-            height: 24px;
+        .waiting-cursor .cursor {
+            width: 3px;
+            height: 32px;
             background: var(--accent);
             border-radius: 2px;
-            animation: barPulse 1.2s ease-in-out infinite;
+            animation: blink 0.6s infinite;
         }
         
-        .bar:nth-child(1) { animation-delay: 0s; }
-        .bar:nth-child(2) { animation-delay: 0.2s; }
-        .bar:nth-child(3) { animation-delay: 0.4s; }
-        .bar:nth-child(4) { animation-delay: 0.6s; }
-        .bar:nth-child(5) { animation-delay: 0.8s; }
-        
-        @keyframes barPulse {
-            0%, 100% { transform: scaleY(0.5); opacity: 0.5; }
-            50% { transform: scaleY(1); opacity: 1; }
+        @keyframes blink {
+            0%, 45% { opacity: 1; }
+            50%, 100% { opacity: 0; }
         }
         
         .listening-text {
@@ -225,26 +222,23 @@
             vertical-align: text-bottom;
         }
         
-        @keyframes blink {
-            0%, 45% { opacity: 1; }
-            50%, 100% { opacity: 0; }
-        }
-        
         .guidance-text strong { font-weight: 700; }
         
-        .dismiss-btn {
-            padding: 10px 20px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.2s;
+        .dismiss-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            opacity: 0;
+            transition: opacity 0.3s;
+            margin-top: 24px;
         }
         
-        .dismiss-btn:hover {
-            background: var(--border);
+        .guidance-state.active .dismiss-hint {
+            opacity: 1;
+            transition-delay: 1s;
+        }
+        
+        .guidance-area.has-guidance {
+            cursor: pointer;
         }
         
         /* Client Card */
@@ -481,21 +475,17 @@
         
         <div class="main">
             <!-- Guidance Area -->
-            <div class="guidance-area" id="guidanceArea">
+            <div class="guidance-area" id="guidanceArea" onclick="handleGuidanceAreaClick(event)">
                 <div class="listening-state" id="listeningState">
-                    <div class="listening-bars">
-                        <div class="bar"></div>
-                        <div class="bar"></div>
-                        <div class="bar"></div>
-                        <div class="bar"></div>
-                        <div class="bar"></div>
+                    <div class="waiting-cursor">
+                        <div class="cursor"></div>
                     </div>
                     <div class="listening-text">Type an objection below to test</div>
                 </div>
                 
                 <div class="guidance-state" id="guidanceState">
                     <div class="guidance-text" id="guidanceText"></div>
-                    <button class="dismiss-btn" onclick="dismissGuidance()">Dismiss</button>
+                    <div class="dismiss-hint">tap anywhere to dismiss</div>
                 </div>
             </div>
             
@@ -705,6 +695,13 @@
             return text
                 .replace(/(\$[\d,]+)/g, '<strong>$1</strong>')
                 .replace(/(\d+%)/g, '<strong>$1</strong>');
+        }
+        
+        function handleGuidanceAreaClick(event) {
+            // Only dismiss if guidance is showing
+            if (dom.guidanceState.classList.contains('active')) {
+                dismissGuidance();
+            }
         }
         
         function dismissGuidance() {
