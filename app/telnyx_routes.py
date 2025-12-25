@@ -83,10 +83,14 @@ async def start_call(data: StartCallRequest):
 
 @router.post("/end-call")
 async def end_call(data: EndCallRequest):
-    """End a call session"""
+    """End a call session - hangs up both phone legs"""
     session = await session_manager.get_session(data.session_id)
     
-    if session and session.started_at:
+    if not session:
+        return {"success": False, "message": "Session not found"}
+    
+    # Log usage before ending
+    if session.started_at:
         duration = session.get_duration() or 0
         log_telnyx_usage(
             call_duration_seconds=duration,
@@ -95,9 +99,28 @@ async def end_call(data: EndCallRequest):
             call_control_id=session.agent_call_sid
         )
     
-    end_conference(data.session_id)
+    # Hang up both call legs
+    hung_up = []
+    if session.agent_call_sid:
+        result = hangup_call(session.agent_call_sid)
+        if result.get("success"):
+            hung_up.append("agent")
+        logger.info(f"Hangup agent call: {result}")
+    
+    if session.client_call_sid:
+        result = hangup_call(session.client_call_sid)
+        if result.get("success"):
+            hung_up.append("client")
+        logger.info(f"Hangup client call: {result}")
+    
+    # End the session
     await session_manager.end_session(data.session_id)
-    return {"success": True, "message": "Call ended"}
+    
+    return {
+        "success": True, 
+        "message": "Call ended",
+        "hung_up": hung_up
+    }
 
 
 @router.get("/session/{session_id}")
@@ -209,12 +232,58 @@ async def call_status(request: Request):
 
 @router.post("/webhook")
 async def main_webhook(request: Request):
-    """Main webhook for Call Control API events"""
+    """Main webhook for Call Control API events - handles hangups"""
     try:
         body = await request.json()
-        event_type = body.get("data", {}).get("event_type", "")
+        data = body.get("data", {})
+        event_type = data.get("event_type", "")
+        payload = data.get("payload", {})
+        
         logger.info(f"Webhook event: {event_type}")
+        print(f"[Webhook] Event: {event_type}", flush=True)
+        
+        # Handle call hangup
+        if event_type == "call.hangup":
+            call_control_id = payload.get("call_control_id", "")
+            hangup_cause = payload.get("hangup_cause", "unknown")
+            
+            print(f"[Webhook] Call hangup: {call_control_id}, cause: {hangup_cause}", flush=True)
+            
+            # Find session by call_control_id
+            session = await _find_session_by_call_id(call_control_id)
+            
+            if session:
+                session_id = session.session_id
+                is_agent = session.agent_call_sid == call_control_id
+                is_client = session.client_call_sid == call_control_id
+                
+                # Notify frontend
+                await session_manager._broadcast_to_session(session_id, {
+                    "type": "call_hangup",
+                    "party": "agent" if is_agent else "client",
+                    "cause": hangup_cause
+                })
+                
+                # If either party hangs up, end the whole session
+                # Hang up the other party too
+                if is_agent and session.client_call_sid:
+                    hangup_call(session.client_call_sid)
+                elif is_client and session.agent_call_sid:
+                    hangup_call(session.agent_call_sid)
+                
+                # End session
+                await session_manager.end_session(session_id)
+                
     except Exception as e:
         logger.error(f"Webhook error: {e}")
+        print(f"[Webhook] Error: {e}", flush=True)
     
     return Response(content="", status_code=200)
+
+
+async def _find_session_by_call_id(call_control_id: str):
+    """Find session by agent or client call ID"""
+    for session in (await session_manager.get_active_sessions_objects()):
+        if session.agent_call_sid == call_control_id or session.client_call_sid == call_control_id:
+            return session
+    return None

@@ -645,6 +645,15 @@
             animation: ringPulse 2s ease-in-out infinite;
         }
         
+        .connecting-icon.connected {
+            background: var(--success-soft);
+            animation: none;
+        }
+        
+        .connecting-icon.connected svg {
+            color: var(--success);
+        }
+        
         @keyframes ringPulse {
             0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4); }
             50% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(96, 165, 250, 0); }
@@ -666,9 +675,82 @@
         .connecting-subtitle {
             font-size: 0.9rem;
             color: var(--text-secondary);
-            margin-bottom: 32px;
+            margin-bottom: 24px;
             max-width: 260px;
             line-height: 1.5;
+        }
+        
+        /* Connection Steps */
+        .connection-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 32px;
+            width: 100%;
+            max-width: 280px;
+        }
+        
+        .connection-step {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--surface);
+            border-radius: 12px;
+            opacity: 0.4;
+            transition: all 0.3s ease;
+        }
+        
+        .connection-step.active {
+            opacity: 1;
+            background: var(--accent-soft);
+        }
+        
+        .connection-step.complete {
+            opacity: 1;
+            background: var(--success-soft);
+        }
+        
+        .step-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--border);
+            flex-shrink: 0;
+        }
+        
+        .connection-step.active .step-icon {
+            background: var(--accent);
+            animation: stepPulse 1.5s ease-in-out infinite;
+        }
+        
+        .connection-step.complete .step-icon {
+            background: var(--success);
+        }
+        
+        @keyframes stepPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .step-icon svg {
+            width: 16px;
+            height: 16px;
+            color: white;
+        }
+        
+        .step-text {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+        
+        .connection-step.active .step-text,
+        .connection-step.complete .step-text {
+            color: var(--text);
         }
         
         .connecting-cancel {
@@ -1659,7 +1741,7 @@
                 </svg>
             </div>
             <h1 class="start-title">Ready to Coach</h1>
-            <p class="start-subtitle">Enter client's number below, or leave blank for 3-way calling.</p>
+            <p class="start-subtitle">Enter client's number below to start the call.</p>
             
             <div class="start-phone-display" id="phoneDisplay">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1679,16 +1761,6 @@
                 <div class="client-phone-hint">We'll dial your client after you answer</div>
             </div>
             
-            <!-- Call Type Selector -->
-            <div class="call-type-selector">
-                <div class="call-type-label">Call Type</div>
-                <div class="call-type-buttons">
-                    <button class="call-type-btn active" data-type="phone" onclick="Coachd.setCallType('phone')">Phone</button>
-                    <button class="call-type-btn" data-type="presentation" onclick="Coachd.setCallType('presentation')">Presentation</button>
-                </div>
-                <div class="call-type-hint" id="callTypeHint">Setting appointments (2-3 min)</div>
-            </div>
-            
             <button class="start-btn" id="startBtn" onclick="Coachd.startCall()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
@@ -1700,13 +1772,45 @@
         
         <!-- Connecting Screen -->
         <div class="screen connecting-screen" id="connectingScreen">
-            <div class="connecting-icon">
+            <div class="connecting-icon" id="connectingIcon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                 </svg>
             </div>
-            <h1 class="connecting-title">Calling Your Phone...</h1>
-            <p class="connecting-subtitle">Answer the call to connect with Coachd</p>
+            <h1 class="connecting-title" id="connectingTitle">Setting Up Call...</h1>
+            <p class="connecting-subtitle" id="connectingSubtitle">This will just take a moment</p>
+            
+            <div class="connection-steps">
+                <div class="connection-step active" id="stepAgent">
+                    <div class="step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                    </div>
+                    <span class="step-text" id="stepAgentText">Calling your phone...</span>
+                </div>
+                
+                <div class="connection-step" id="stepClient">
+                    <div class="step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                    </div>
+                    <span class="step-text" id="stepClientText">Calling client...</span>
+                </div>
+                
+                <div class="connection-step" id="stepReady">
+                    <div class="step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                            <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                    </div>
+                    <span class="step-text">Ready to coach!</span>
+                </div>
+            </div>
+            
             <button class="connecting-cancel" onclick="Coachd.cancelCall()">Cancel</button>
         </div>
         
@@ -1722,7 +1826,7 @@
                         <div class="bar"></div>
                     </div>
                     <div class="listening-text">Listening...</div>
-                    <div class="listening-hint">3-way in your client now</div>
+                    <div class="listening-hint">Listening for objections</div>
                 </div>
                 
                 <div class="guidance-state" id="guidanceState">
@@ -1901,7 +2005,7 @@
             // SECURITY: Validated agency from home page
             validatedAgencyCode: null,
             validatedAgencyName: null,
-            callType: 'phone',
+            callType: 'presentation',
             isInCall: false,
             seconds: 0,
             timerInterval: null,
@@ -2307,6 +2411,10 @@
             
             setStatus('connecting');
             showScreen('connectingScreen');
+            resetConnectionSteps();
+            
+            // Remove connected class from icon if present
+            document.getElementById('connectingIcon')?.classList.remove('connected');
             
             // Update connecting screen message based on mode
             const connectingTitle = document.querySelector('.connecting-title');
@@ -2316,7 +2424,7 @@
                 if (connectingSubtitle) connectingSubtitle.textContent = 'Answer, then we\'ll dial your client';
             } else {
                 if (connectingTitle) connectingTitle.textContent = 'Calling Your Phone...';
-                if (connectingSubtitle) connectingSubtitle.textContent = 'Answer and 3-way in your client';
+                if (connectingSubtitle) connectingSubtitle.textContent = 'Answer, then we'll dial your client';
             }
             
             try {
@@ -2435,18 +2543,29 @@
                     console.log('✅ Speakers identified:', msg.message);
                     setStatus('Coaching active');
                     break;
+                case 'session_update':
+                    handleSessionUpdate(msg.data || msg);
+                    break;
                 case 'client_dialing':
-                    // Click-to-call: Dialing client now
-                    console.log('📞 Dialing client...');
-                    const dialingTitle = document.querySelector('.connecting-title');
-                    if (dialingTitle) dialingTitle.textContent = 'Dialing Client...';
-                    const dialingSubtitle = document.querySelector('.connecting-subtitle');
-                    if (dialingSubtitle) dialingSubtitle.textContent = 'Connecting you now';
+                    // Click-to-call: Agent connected, now dialing client
+                    console.log('📞 Agent connected, dialing client...');
+                    updateConnectionStep('agent', 'complete');
+                    updateConnectionStep('client', 'active');
+                    document.getElementById('stepAgentText').textContent = 'You\'re connected!';
+                    document.getElementById('connectingTitle').textContent = 'Calling Client...';
+                    document.getElementById('connectingSubtitle').textContent = 'Waiting for them to answer';
                     break;
                 case 'client_connected':
-                    // Click-to-call: Client answered
+                    // Click-to-call: Client answered - all connected!
                     console.log('✅ Client connected!');
-                    onCallConnected();
+                    updateConnectionStep('client', 'complete');
+                    updateConnectionStep('ready', 'complete');
+                    document.getElementById('stepClientText').textContent = 'Client connected!';
+                    document.getElementById('connectingTitle').textContent = 'All Connected!';
+                    document.getElementById('connectingSubtitle').textContent = 'Starting coaching...';
+                    document.getElementById('connectingIcon').classList.add('connected');
+                    // Brief pause to show success, then transition
+                    setTimeout(() => onCallConnected(), 800);
                     break;
                 case 'guidance':
                     handleGuidance(msg);
@@ -2468,6 +2587,11 @@
                     break;
                 case 'call_ended':
                     endCall();
+                    break;
+                case 'call_hangup':
+                    // Phone hung up (from Telnyx webhook)
+                    console.log('📵 Call hangup:', msg.party, msg.cause);
+                    handleCallHangup(msg);
                     break;
                 case 'error':
                     console.error('Server error:', msg.message);
@@ -2491,6 +2615,43 @@
             if (data.status === 'agent_connected' || data.status === 'in_progress') {
                 onCallConnected();
             }
+        }
+        
+        function updateConnectionStep(step, status) {
+            const stepEl = document.getElementById('step' + step.charAt(0).toUpperCase() + step.slice(1));
+            if (!stepEl) return;
+            
+            stepEl.classList.remove('active', 'complete');
+            if (status === 'active') {
+                stepEl.classList.add('active');
+            } else if (status === 'complete') {
+                stepEl.classList.add('complete');
+            }
+        }
+        
+        function handleCallHangup(msg) {
+            const party = msg.party || 'unknown';
+            const cause = msg.cause || 'normal';
+            
+            console.log(`[Hangup] ${party} hung up: ${cause}`);
+            
+            // End the call - this will show outcome screen
+            endCall();
+        }
+        
+        function resetConnectionSteps() {
+            const steps = ['Agent', 'Client', 'Ready'];
+            steps.forEach((step, index) => {
+                const el = document.getElementById('step' + step);
+                if (el) {
+                    el.classList.remove('active', 'complete');
+                    if (index === 0) el.classList.add('active');
+                }
+            });
+            document.getElementById('stepAgentText').textContent = 'Calling your phone...';
+            document.getElementById('stepClientText').textContent = 'Calling client...';
+            document.getElementById('connectingTitle').textContent = 'Setting Up Call...';
+            document.getElementById('connectingSubtitle').textContent = 'This will just take a moment';
         }
         
         function onCallConnected() {
@@ -2520,7 +2681,7 @@
                 if (state.clientPhone) {
                     listeningHint.textContent = 'Connected — coaching active';
                 } else {
-                    listeningHint.textContent = '3-way in your client now';
+                    listeningHint.textContent = 'Listening for objections';
                 }
             }
         }

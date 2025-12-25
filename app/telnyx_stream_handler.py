@@ -89,7 +89,8 @@ class ClaudeAnalyzer:
     def __init__(self, session_id: str, agency: str = None):
         self.session_id = session_id
         self.agency = agency
-        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key) if settings.anthropic_api_key else None
+        # Use ASYNC client for true token-by-token streaming
+        self.client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key) if settings.anthropic_api_key else None
         self.last_analysis_time = 0
         self.is_analyzing = False
         self._rag_context = None
@@ -160,7 +161,7 @@ RESPOND WITH EXACTLY ONE OF:
 
 Do not explain your reasoning. Just give the guidance or NO_GUIDANCE_NEEDED."""
 
-            response = self.client.messages.create(
+            response = await self.client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=200,
                 messages=[{"role": "user", "content": prompt}]
@@ -190,7 +191,8 @@ Do not explain your reasoning. Just give the guidance or NO_GUIDANCE_NEEDED."""
     
     async def analyze_stream(self, client_text: str, conversation: ConversationBuffer):
         """
-        Streaming version - yields guidance chunks for faster first-token.
+        Streaming version - yields guidance token-by-token for fastest display.
+        Uses async client for true real-time streaming like chat.
         """
         if not await self.should_analyze(client_text):
             return
@@ -220,12 +222,13 @@ If no guidance needed, respond only with: NO_GUIDANCE_NEEDED"""
             input_tokens = 0
             output_tokens = 0
             
-            with self.client.messages.stream(
+            # TRUE async streaming - token by token like chat
+            async with self.client.messages.stream(
                 model="claude-sonnet-4-20250514",
                 max_tokens=200,
                 messages=[{"role": "user", "content": prompt}]
             ) as stream:
-                for text in stream.text_stream:
+                async for text in stream.text_stream:
                     collected_text += text
                     
                     # Check early if it's NO_GUIDANCE_NEEDED
@@ -234,8 +237,8 @@ If no guidance needed, respond only with: NO_GUIDANCE_NEEDED"""
                     
                     yield text
                 
-                # Get final usage
-                final = stream.get_final_message()
+                # Get final usage after stream completes
+                final = await stream.get_final_message()
                 if final and final.usage:
                     input_tokens = final.usage.input_tokens
                     output_tokens = final.usage.output_tokens

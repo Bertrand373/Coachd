@@ -205,9 +205,16 @@ class CallSessionManager:
         logger.info(f"Session {session_id} ended. Duration: {session.get_duration()}s")
     
     async def get_active_sessions(self) -> list:
-        """Get all active sessions"""
+        """Get all active sessions as dicts"""
         return [
             s.to_dict() for s in self._sessions.values() 
+            if s.status not in [CallStatus.COMPLETED, CallStatus.FAILED]
+        ]
+    
+    async def get_active_sessions_objects(self) -> list:
+        """Get all active session objects"""
+        return [
+            s for s in self._sessions.values() 
             if s.status not in [CallStatus.COMPLETED, CallStatus.FAILED]
         ]
 

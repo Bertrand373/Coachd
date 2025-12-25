@@ -861,3 +861,82 @@ async def test_objection(data: QueryRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class TestGuidanceRequest(BaseModel):
+    text: str
+    history: list = []
+    context: dict = {}
+
+
+@app.post("/api/test-guidance")
+async def test_guidance_stream(data: TestGuidanceRequest):
+    """
+    Streaming test endpoint for guidance UI testing.
+    Simulates what Claude would respond with during a live call.
+    """
+    import anthropic
+    from fastapi.responses import StreamingResponse
+    
+    if not settings.anthropic_api_key:
+        raise HTTPException(status_code=503, detail="AI service not configured")
+    
+    async def generate():
+        try:
+            client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+            
+            # Build conversation context from history
+            history_text = ""
+            if data.history:
+                for item in data.history[-6:]:  # Last 6 exchanges
+                    role = "CLIENT" if item.get("type") == "client" else "AGENT GUIDANCE"
+                    history_text += f"{role}: {item.get('text', '')}\n"
+            
+            system_prompt = """You are an AI sales coach for life insurance agents. 
+When a client raises an objection, provide a brief, conversational response the agent should say.
+
+Rules:
+- Keep responses to 2-3 sentences max
+- Be conversational, not scripted
+- Address the specific objection directly
+- Guide toward next steps when appropriate
+- If it's not really an objection (just conversation), respond with: NO_GUIDANCE_NEEDED
+
+Examples of good responses:
+- "I completely understand. Let me ask you this - if something happened to you tomorrow, would your family still need that financial protection? [wait for yes] Then let's make sure they have it."
+- "That makes sense. Most of my clients felt the same way until they saw how affordable it actually is. What if I could show you a plan that fits your budget?"
+"""
+            
+            messages = [{
+                "role": "user",
+                "content": f"""Previous conversation:
+{history_text}
+
+CLIENT just said: "{data.text}"
+
+What should the agent say in response? Remember: 2-3 sentences max, conversational tone."""
+            }]
+            
+            async with client.messages.stream(
+                model="claude-sonnet-4-20250514",
+                max_tokens=300,
+                system=system_prompt,
+                messages=messages
+            ) as stream:
+                async for text in stream.text_stream:
+                    yield f"data: {json.dumps({'text': text})}\n\n"
+            
+            yield "data: [DONE]\n\n"
+            
+        except Exception as e:
+            logger.error(f"Test guidance error: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
+    )
