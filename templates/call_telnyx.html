@@ -225,13 +225,23 @@
             flex-direction: column;
         }
         
-        .screen.active { display: flex; }
+        .screen.active { 
+            display: flex;
+            flex-direction: column;
+        }
         
         /* ========== IDENTIFY SCREEN ========== */
         .identify-screen {
             justify-content: center;
             align-items: center;
             padding: 40px 24px;
+        }
+        
+        .identify-screen.active {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
         
         .identify-card {
@@ -408,6 +418,13 @@
             align-items: center;
             text-align: center;
             padding: 40px 24px;
+        }
+        
+        .start-screen.active {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
         
         .start-icon {
@@ -607,6 +624,13 @@
             align-items: center;
             text-align: center;
             padding: 40px 24px;
+        }
+        
+        .connecting-screen.active {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
         
         .connecting-icon {

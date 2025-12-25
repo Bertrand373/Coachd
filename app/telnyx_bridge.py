@@ -122,14 +122,15 @@ def initiate_click_to_call(agent_phone: str, client_phone: str, session_id: str)
 
 def dial_client(client_phone: str, agent_caller_id: str, session_id: str) -> dict:
     """
-    Dial client with agent's number as caller ID.
+    Dial client. Uses Telnyx number as caller ID.
+    (To use agent's number, verify it in Telnyx Portal → Verified Numbers)
     """
     api_key = get_telnyx_api_key()
     app_id = get_telnyx_app_id()
     
     client_phone = normalize_phone(client_phone)
-    agent_caller_id = normalize_phone(agent_caller_id)
-    from_number = agent_caller_id if agent_caller_id else get_telnyx_phone()
+    # Always use Telnyx number - agent number requires verification
+    from_number = get_telnyx_phone()
     
     logger.info(f"[Telnyx] Dialing client {client_phone} from {from_number}")
     print(f"[Telnyx] Dialing client {client_phone} from {from_number}", flush=True)
